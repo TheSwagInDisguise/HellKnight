@@ -352,7 +352,8 @@ extension GameScene {
         if let p = player {
             burst(at: p.position, color: Ink.blood, count: 40, speed: 300)
             splat(at: p.position, size: 140, color: Ink.blood, alpha: 0.9, fade: 30)
-            p.run(.group([.fadeOut(withDuration: 0.9), .scale(to: 0.5, duration: 0.9)]))
+            p.die()
+            p.run(.sequence([.wait(forDuration: 1.0), .fadeAlpha(to: 0.6, duration: 0.5)]))
         }
         recordRunEnd(won: false)
         hud.run(.sequence([.wait(forDuration: 1.4), .run { [weak self] in self?.showEndScreen(won: false) }]))

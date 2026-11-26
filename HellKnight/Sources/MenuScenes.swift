@@ -69,8 +69,13 @@ final class TitleScene: BaseScene {
         sig.alpha = 0.35
         floorNode.addChild(sig)
         sig.run(.repeatForever(.rotate(byAngle: .pi * 2, duration: 40)))
-        let knight = SKSpriteNode(texture: Tex.knight(), size: CGSize(width: 110, height: 144))
-        knight.position = CGPoint(x: 0, y: H * 0.17)
+        let kInfo = Player.sheetInfo(WeaponKind(rawValue: Meta.shared.data.weapon) ?? .blade)
+        let kSheet = SpriteSheet.get(kInfo)
+        let knight = SKSpriteNode(texture: kSheet.frames("idle").first,
+                                  size: CGSize(width: kInfo.frame.width * 1.7, height: kInfo.frame.height * 1.7))
+        knight.run(.repeatForever(.animate(with: kSheet.frames("idle"), timePerFrame: 0.12)))
+        knight.anchorPoint = kInfo.anchor
+        knight.position = CGPoint(x: 0, y: H * 0.17 - 62)
         knight.zPosition = 1
         addChild(knight)
         knight.run(.repeatForever(.sequence([.moveBy(x: 0, y: 6, duration: 1.4), .moveBy(x: 0, y: -6, duration: 1.4)])))

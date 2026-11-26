@@ -112,7 +112,8 @@ extension GameScene {
             p.lungeVel = CGPoint(angle: a, length: sw.lunge / 0.1)
             p.lungeTime = 0.1
         }
-        p.playSwing(angle: a, arcDeg: sw.arc)
+        p.setFacing(a)
+        p.attack(index: i, count: combo.count, duration: p.attackTimer)
         attackVisual(at: p.position, angle: a, range: range, arcDeg: sw.arc, color: slotColor(.attack), finisher: finisher)
         sfx(.swing, finisher ? 1 : 0.7)
         let hits = arcHit(origin: p.position, angle: a, range: range, arc: sw.arc * .pi / 180,
@@ -186,6 +187,7 @@ extension GameScene {
         if p.castRecharge <= 0 { p.castRecharge = 2.5 }
         let a = aimAngle(range: 750)
         p.setFacing(a)
+        p.castAnim()
         p.attackTimer = 0.2
         let col = runData.slots[.cast]?.patron.color ?? UIColor(hex: 0xff3a2a)
         spawnProjectile(at: p.position + CGPoint(angle: a, length: 22), vel: CGPoint(angle: a, length: 820),
@@ -339,7 +341,13 @@ extension GameScene {
             }
         }
         if let b = e as? Boss, b === boss { bossDefeated() }
-        e.run(.sequence([.group([.fadeOut(withDuration: 0.25), .scale(to: 1.3, duration: 0.25)]), .removeFromParent()]))
+        if let a = e.animator {
+            e.sprite.removeAllActions()
+            e.sprite.run(a.action("death", duration: e is Boss ? 1.2 : 0.55))
+            e.run(.sequence([.wait(forDuration: e is Boss ? 1.6 : 0.6), .fadeOut(withDuration: 0.35), .removeFromParent()]))
+        } else {
+            e.run(.sequence([.group([.fadeOut(withDuration: 0.25), .scale(to: 1.3, duration: 0.25)]), .removeFromParent()]))
+        }
     }
 
     func chainLightning(from start: Enemy, damage: CGFloat, jumps: Int) {

@@ -8,13 +8,7 @@ final class Player: SKNode {
     let weapon: WeaponKind
     let up = Billboard()
     let body: SKSpriteNode
-    let cape = SKSpriteNode(texture: Tex.knightCape(), size: Player.bodySize)
-    var capeAngle: CGFloat = 0
-    var lean: CGFloat = 0
-    var idleTime: CGFloat = 0
-    let pivot = SKNode()
-    let weaponSprite: SKSpriteNode
-    let weaponBase: CGPoint
+    let anim: Animator
     let shadow = SKSpriteNode(texture: Tex.softShadow(), size: CGSize(width: 46, height: 46))
     let lightPool = SKSpriteNode(texture: Tex.glow(), size: CGSize(width: 260, height: 260))
 
@@ -34,34 +28,28 @@ final class Player: SKNode {
     var lungeTime: CGFloat = 0
     var afterimageTimer: CGFloat = 0
     var moving = false
-    var walkPhase: CGFloat = 0
     var swingCount = 0
+    var dying = false
 
-    static let bodySize = CGSize(width: 64, height: 84)
-    static let bodyAnchor = CGPoint(x: 0.5, y: 0.04)
+    static func sheetInfo(_ w: WeaponKind) -> SheetInfo {
+        switch w {
+        case .blade: return SpriteData.knight_blade
+        case .pike: return SpriteData.knight_pike
+        case .fists: return SpriteData.knight_fists
+        }
+    }
+
+    static let bodySize = SpriteData.knight_blade.frame
+    static let bodyAnchor = SpriteData.knight_blade.anchor
 
     init(weapon: WeaponKind) {
         self.weapon = weapon
-        let b = SKSpriteNode(texture: Tex.knightBody(), size: Player.bodySize)
-        b.anchorPoint = Player.bodyAnchor
+        let info = Player.sheetInfo(weapon)
+        let sheet = SpriteSheet.get(info)
+        let b = SKSpriteNode(texture: sheet.frames("idle").first, size: info.frame)
+        b.anchorPoint = info.anchor
         body = b
-        let wt = Tex.weapon(weapon)
-        let ws: SKSpriteNode
-        switch weapon {
-        case .blade:
-            ws = SKSpriteNode(texture: wt, size: CGSize(width: 58, height: 13))
-            ws.anchorPoint = CGPoint(x: 0.12, y: 0.5)
-            weaponBase = CGPoint(x: 12, y: 0)
-        case .pike:
-            ws = SKSpriteNode(texture: wt, size: CGSize(width: 90, height: 13))
-            ws.anchorPoint = CGPoint(x: 0.25, y: 0.5)
-            weaponBase = CGPoint(x: 8, y: 0)
-        case .fists:
-            ws = SKSpriteNode(texture: wt, size: CGSize(width: 22, height: 22))
-            ws.anchorPoint = CGPoint(x: 0.4, y: 0.5)
-            weaponBase = CGPoint(x: 20, y: 0)
-        }
-        weaponSprite = ws
+        anim = Animator(sheet: sheet, sprite: b)
         super.init()
         lightPool.color = Ink.bone
         lightPool.colorBlendFactor = 1
@@ -72,86 +60,63 @@ final class Player: SKNode {
         shadow.zPosition = -2
         addChild(shadow)
         addChild(up)
-        weaponSprite.position = weaponBase
-        pivot.position = CGPoint(x: 0, y: 34)
-        pivot.addChild(weaponSprite)
-        up.addChild(pivot)
         up.addChild(body)
-        // Cape hangs from the shoulders (y=30 of 84 in the texture) and sways behind the body.
-        cape.anchorPoint = CGPoint(x: 0.5, y: (84 - 30) / 84)
-        cape.position = CGPoint(x: 0, y: 84 * (1 - Player.bodyAnchor.y) - 30)
-        cape.zPosition = -0.5
-        body.addChild(cape)
         setFacing(.pi / 4)
     }
 
     required init?(coder aDecoder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    var isSwinging: Bool { pivot.action(forKey: "swing") != nil }
+    var isSwinging: Bool { anim.busy && anim.current.hasPrefix("attack") }
 
     func setFacing(_ a: CGFloat) {
         facing = a
-        let sa = screenAngle(a)
-        pivot.zRotation = sa
-        pivot.zPosition = sin(sa) > 0.3 ? -1 : 1
-        let cx = cos(sa)
+        let cx = cos(screenAngle(a))
         if cx < -0.15 { body.xScale = -1 } else if cx > 0.15 { body.xScale = 1 }
     }
 
-    func playSwing(angle a: CGFloat, arcDeg: CGFloat) {
+    /// Basic attack: picks the combo animation for this swing.
+    func attack(index: Int, count: Int, duration: CGFloat) {
         swingCount += 1
-        pivot.removeAction(forKey: "swing")
-        weaponSprite.removeAction(forKey: "thrust")
-        setFacing(a)
-        let sa = screenAngle(a)
-        body.removeAction(forKey: "squash")
-        body.yScale = 0.9
-        body.run(.scaleY(to: 1, duration: 0.14), withKey: "squash")
-        switch weapon {
-        case .blade:
-            let half = arcDeg * .pi / 360
-            let dir: CGFloat = swingCount % 2 == 0 ? 1 : -1
-            pivot.zRotation = sa + half * dir
-            pivot.run(.rotate(toAngle: sa - half * dir, duration: 0.09), withKey: "swing")
-        case .pike, .fists:
-            pivot.zRotation = sa
-            let dist: CGFloat = weapon == .pike ? 34 : 20
-            let side: CGFloat = weapon == .fists ? (swingCount % 2 == 0 ? 7 : -7) : 0
-            weaponSprite.position = weaponBase + CGPoint(x: 0, y: side)
-            weaponSprite.run(.sequence([
-                .moveBy(x: dist, y: 0, duration: 0.05),
-                .move(to: weaponBase, duration: 0.12),
-            ]), withKey: "thrust")
-            pivot.run(.wait(forDuration: 0.12), withKey: "swing")
+        let name: String
+        if index == count - 1 {
+            name = "attack3"
+        } else {
+            name = index % 2 == 0 ? "attack1" : "attack2"
         }
+        anim.once(name, duration: max(0.22, duration * 1.45))
+    }
+
+    /// Specials and other weapon moves.
+    func playSwing(angle a: CGFloat, arcDeg: CGFloat) {
+        setFacing(a)
+        anim.once("attack3", duration: 0.42)
     }
 
     func spin() {
-        pivot.removeAction(forKey: "swing")
-        pivot.run(.rotate(byAngle: .pi * 2, duration: 0.25), withKey: "swing")
+        anim.once("attack3", duration: 0.4)
+    }
+
+    func castAnim() {
+        anim.once("cast", duration: 0.38)
+    }
+
+    func die() {
+        dying = true
+        body.run(anim.action("death", duration: 0.9))
     }
 
     func animate(_ dt: CGFloat) {
-        idleTime += dt
-        let k = 1 - exp(-dt * 12)
-        let facingSign: CGFloat = body.xScale < 0 ? -1 : 1
-        let dashing = dashTime > 0
-        if moving || dashing {
-            walkPhase += dt * (dashing ? 0 : 14)
-            body.position = CGPoint(x: 0, y: dashing ? 2 : abs(sin(walkPhase)) * 3.5)
-            lean += ((dashing ? -0.16 : -0.07) - lean) * k
-            if body.action(forKey: "squash") == nil { body.yScale = dashing ? 0.93 : 1 + abs(cos(walkPhase)) * 0.015 }
-        } else {
-            body.position = .zero
-            lean += (0 - lean) * k
-            if body.action(forKey: "squash") == nil { body.yScale = 1 + sin(idleTime * 2.6) * 0.022 }
+        guard !dying else { return }
+        if dashTime > 0 {
+            if anim.current != "dash" || anim.busy { anim.play("dash", fps: 16) }
+        } else if !anim.busy {
+            if moving {
+                anim.play("run", fps: 13)
+            } else {
+                anim.play("idle", fps: 8)
+            }
         }
-        body.zRotation = (lean + (moving ? sin(walkPhase) * 0.035 : 0)) * facingSign
-        // Cape trails behind when moving and flutters, eased so it never snaps.
-        let capeTarget: CGFloat = dashing ? -0.55 : (moving ? -0.28 + sin(walkPhase * 0.9) * 0.07 : sin(idleTime * 1.7) * 0.035)
-        capeAngle += (capeTarget - capeAngle) * (1 - exp(-dt * 8))
-        cape.zRotation = capeAngle - lean * 0.5
-        cape.xScale = 1 + (moving ? 0.04 : 0)
+        anim.update(dt)
         if invuln > 0 && dashTime <= 0 {
             body.alpha = sin(invuln * 40) > 0 ? 0.45 : 1
         } else {
@@ -160,6 +125,7 @@ final class Player: SKNode {
     }
 
     func flashHurt() {
+        if !anim.busy || anim.current == "run" || anim.current == "idle" { anim.once("hurt", duration: 0.22) }
         body.removeAction(forKey: "hurt")
         body.run(.sequence([
             .colorize(with: Ink.blood, colorBlendFactor: 0.85, duration: 0),

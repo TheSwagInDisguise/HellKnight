@@ -210,8 +210,8 @@ extension GameScene {
         n.zPosition = p.zPosition - 0.01
         let b = Billboard()
         n.addChild(b)
-        let s = SKSpriteNode(texture: Tex.knight(), size: Player.bodySize)
-        s.anchorPoint = Player.bodyAnchor
+        let s = SKSpriteNode(texture: p.body.texture, size: p.body.size)
+        s.anchorPoint = p.body.anchorPoint
         s.xScale = p.body.xScale
         s.position = p.body.position
         s.color = runData.slots[.dash]?.patron.color ?? Ink.bone

@@ -115,6 +115,7 @@ extension GameScene {
             g.isHidden = !playerOccluded()
             if !g.isHidden {
                 g.position = screenPoint(p.position) + p.body.position
+                g.texture = p.body.texture
                 g.xScale = p.body.xScale
             }
         }

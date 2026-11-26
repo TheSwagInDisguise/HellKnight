@@ -35,6 +35,9 @@ class Enemy: SKNode {
     var bobPhase = CGFloat.random(in: 0...6)
     var spriteScale: CGFloat = 1
     var lastPos = CGPoint.zero
+    var animator: Animator?
+    /// Looping animation that replaces idle/run while set (e.g. charging, casting).
+    var loopOverride: String?
     var walkPhase = CGFloat.random(in: 0...6)
     var walkAmount: CGFloat = 0
 
@@ -92,6 +95,14 @@ class Enemy: SKNode {
 
     var moveSpeed: CGFloat { baseSpeed * (chillTime > 0 ? (1 - chillAmount) : 1) }
 
+    /// Switch this enemy to an animated sprite sheet.
+    func useSheet(_ info: SheetInfo, scale k: CGFloat = 1) {
+        let sheet = SpriteSheet.get(info)
+        sprite.size = CGSize(width: info.frame.width * k, height: info.frame.height * k)
+        sprite.anchorPoint = info.anchor
+        animator = Animator(sheet: sheet, sprite: sprite)
+    }
+
     func makeElite() {
         elite = true
         maxHp *= 1.8
@@ -145,7 +156,7 @@ class Enemy: SKNode {
             think(dt, game: game)
         }
         bobPhase += dt * 3
-        sprite.yScale = spriteScale * (1 + sin(bobPhase) * 0.03)
+        if animator == nil { sprite.yScale = spriteScale * (1 + sin(bobPhase) * 0.03) }
         // Walk cycle: bounce and sway in proportion to actual movement, eased in and out.
         let speedNow = dt > 0 ? position.distance(to: lastPos) / dt : 0
         lastPos = position
@@ -153,7 +164,18 @@ class Enemy: SKNode {
         walkAmount += (target - walkAmount) * (1 - exp(-dt * 10))
         walkPhase += dt * 11 * walkAmount
         let inLeap = (self as? Boss)?.pattern == .leap
-        if !(self is Wisp) && !inLeap {
+        if let a = animator {
+            if !a.busy {
+                if let o = loopOverride {
+                    a.play(o, fps: 12)
+                } else if walkAmount > 0.35 {
+                    a.play("run", fps: 9 + 5 * min(1.5, speedNow / 120))
+                } else {
+                    a.play("idle", fps: 8)
+                }
+            }
+            a.update(dt)
+        } else if !(self is Wisp) && !inLeap {
             sprite.position = CGPoint(x: 0, y: abs(sin(walkPhase)) * 3.5 * walkAmount)
             if sprite.action(forKey: "tilt") == nil {
                 sprite.zRotation = sin(walkPhase) * 0.07 * walkAmount
@@ -189,13 +211,16 @@ class Enemy: SKNode {
     }
 
     func flashHit() {
+        if let a = animator, !(self is Boss), !a.busy || a.current == "hurt" {
+            a.once("hurt", duration: 0.2)
+        }
         sprite.removeAction(forKey: "flash")
         sprite.run(.sequence([
             .colorize(with: .white, colorBlendFactor: 1, duration: 0),
             .wait(forDuration: 0.06),
             .colorize(withColorBlendFactor: 0, duration: 0.08),
         ]), withKey: "flash")
-        let tilt: CGFloat = sprite.xScale > 0 ? -0.16 : 0.16
+        let tilt: CGFloat = animator != nil ? 0 : (sprite.xScale > 0 ? -0.16 : 0.16)
         sprite.removeAction(forKey: "tilt")
         sprite.run(.sequence([.rotate(toAngle: tilt, duration: 0.04), .rotate(toAngle: 0, duration: 0.18)]), withKey: "tilt")
     }
@@ -230,6 +255,7 @@ final class Imp: Enemy {
 
     init(depth: Int) {
         super.init(kind: .imp, depth: depth, texture: Tex.imp(), spriteSize: CGSize(width: 52, height: 58), radius: 16, hp: 42, speed: 140)
+        useSheet(SpriteData.imp, scale: 1.15)
         timer = rnd(0.3, 1.0)
         deathColor = UIColor(hex: 0xff5030)
     }
@@ -247,6 +273,7 @@ final class Imp: Enemy {
                 timer = 0.42
                 dir = (p - position).normalized
                 windupFlash(0.42)
+                animator?.once("attack", duration: 0.7)
                 game.telegraphLine(from: position, angle: dir.angle, length: 140, width: radius * 1.6, duration: 0.42)
             }
         case .windup:
@@ -270,6 +297,7 @@ final class Imp: Enemy {
             moveToward(game.steer(self, p), dt, speedMult: 0.25)
             if timer <= 0 {
                 s = .chase
+                loopOverride = nil
                 timer = rnd(0.4, 0.9)
             }
         }
@@ -286,6 +314,7 @@ final class Archer: Enemy {
 
     init(depth: Int) {
         super.init(kind: .archer, depth: depth, texture: Tex.archer(), spriteSize: CGSize(width: 56, height: 66), radius: 16, hp: 34, speed: 115)
+        useSheet(SpriteData.archer)
         timer = rnd(1.0, 2.0)
         strafe = chance(0.5) ? 1 : -1
         deathColor = UIColor(hex: 0xe0d6bf)
@@ -334,6 +363,7 @@ final class Archer: Enemy {
             timer = 0.75
             aimAngle = d.angle
             windupFlash(0.75)
+            animator?.once("attack", duration: 0.95)
             aimLine = game.telegraphLine(from: position, angle: aimAngle, length: 720, width: 5, duration: 0.75)
         }
     }
@@ -349,6 +379,7 @@ final class Brute: Enemy {
 
     init(depth: Int) {
         super.init(kind: .brute, depth: depth, texture: Tex.brute(), spriteSize: CGSize(width: 86, height: 94), radius: 28, hp: 150, speed: 75)
+        useSheet(SpriteData.brute, scale: 1.05)
         knockResist = 0.25
         timer = rnd(1.0, 2.0)
         deathColor = UIColor(hex: 0xb070d0)
@@ -368,11 +399,13 @@ final class Brute: Enemy {
                 dir = (p - position).normalized
                 face(dir)
                 windupFlash(0.8)
+                animator?.once("attack", duration: 0.8)
                 game.telegraphLine(from: position, angle: dir.angle, length: 440, width: radius * 2, duration: 0.8)
             }
         case .windup:
             if timer <= 0 {
                 s = .charge
+                loopOverride = "charge"
                 timer = 0.65
                 hitDone = false
             }
@@ -389,9 +422,11 @@ final class Brute: Enemy {
                 game.burst(at: position, color: UIColor(hex: 0xb0a090), count: 12, speed: 220)
                 stun = 1.2
                 s = .chase
+                loopOverride = nil
                 timer = 1.8
             } else if timer <= 0 {
                 s = .chase
+                loopOverride = nil
                 timer = 1.6
             }
         }
@@ -410,8 +445,8 @@ final class Wisp: Enemy {
         let acc = Palette.of(depth).accent
         sprite.color = acc
         sprite.colorBlendFactor = 0.45
-        sprite.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-        sprite.position = CGPoint(x: 0, y: 40)
+        useSheet(SpriteData.wisp)
+        sprite.position = CGPoint(x: 0, y: 12)
         shadowNode.alpha = 0.5
         deathColor = acc
     }
@@ -432,9 +467,10 @@ final class Wisp: Enemy {
         let d = game.player.position - position
         let perp = CGPoint(x: -d.y, y: d.x).normalized * (sin(phase) * 0.7)
         position = position + (d.normalized + perp).normalized * (moveSpeed * dt)
-        sprite.position = CGPoint(x: 0, y: 40 + sin(phase * 1.5) * 6)
+        sprite.position = CGPoint(x: 0, y: 12 + sin(phase * 1.5) * 6)
         if d.length < 90 {
             fuse = true
+            loopOverride = "attack"
             timer = 0.75
             game.telegraphCircle(at: position, radius: 95, duration: 0.75)
         }
@@ -449,6 +485,7 @@ final class Priest: Enemy {
 
     init(depth: Int) {
         super.init(kind: .priest, depth: depth, texture: Tex.priest(), spriteSize: CGSize(width: 54, height: 74), radius: 18, hp: 70, speed: 85)
+        useSheet(SpriteData.priest)
         timer = rnd(1.5, 2.5)
         deathColor = UIColor(hex: 0xc060ff)
     }
@@ -486,6 +523,7 @@ final class Priest: Enemy {
         }
         if timer <= 0 {
             casting = true
+            animator?.once("attack", duration: 0.85)
             timer = 0.65
             windupFlash(0.65)
             statusGlow.color = UIColor(hex: 0xff40c0)
@@ -537,6 +575,7 @@ final class Boss: Enemy {
         let cols: [UInt32] = [0xff6a1f, 0x9dff6e, 0x9a7cff]
         color = UIColor(hex: cols[d])
         super.init(kind: .boss, depth: depth, texture: Tex.boss(d), spriteSize: CGSize(width: 160, height: 184), radius: 50, hp: 1300, speed: 105)
+        useSheet([SpriteData.boss0, SpriteData.boss1, SpriteData.boss2][d])
         knockResist = 0
         showsBar = false
         deathColor = color
@@ -564,6 +603,7 @@ final class Boss: Enemy {
         }
         if !phase2 && hp < maxHp * enrageAt {
             phase2 = true
+            animator?.once("roar", duration: 1.0)
             game.hud.banner(shortName, "is enraged!", color: color)
             sfx(.roar)
             game.addShake(10)
@@ -665,6 +705,7 @@ final class Boss: Enemy {
         if (farTime > 1.2 || position.distance(to: p) > 430) && last != .leap {
             farTime = 0
             pattern = .leap
+            animator?.once("attack", duration: 1.0)
             last = .leap
             leapFrom = position
             leapTo = game.room.resolve(p, radius)
@@ -681,18 +722,22 @@ final class Boss: Enemy {
         last = pat
         switch pat {
         case .spiral:
+            loopOverride = "cast"
             sub = 0.3
             spin = rnd(0, 2 * .pi)
             timer = phase2 ? 3.2 : 2.6
             windupFlash(0.3)
         case .charge:
+            loopOverride = "run"
             count = phase2 ? 4 : 3
             startWind(game)
         case .rings:
+            loopOverride = "cast"
             count = phase2 ? 5 : 3
             sub = 0.4
             windupFlash(0.4)
         case .slam:
+            animator?.once("attack", duration: 1.0)
             let n = phase2 ? 7 : 5
             for i in 0..<n {
                 let off = i == 0 ? CGPoint.zero : CGPoint(angle: rnd(0, 2 * .pi), length: rnd(80, 230))
@@ -703,6 +748,7 @@ final class Boss: Enemy {
         case .leap:
             break
         case .summon:
+            animator?.once("roar", duration: 1.1)
             let n = 2 + depth
             for _ in 0..<n {
                 let at = game.room.resolve(position + CGPoint(angle: rnd(0, 2 * .pi), length: rnd(120, 190)), 30)
@@ -715,6 +761,7 @@ final class Boss: Enemy {
     }
 
     func end() {
+        loopOverride = nil
         pattern = nil
         idle = phase2 ? 0.7 : 1.2
     }

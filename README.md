@@ -69,6 +69,15 @@ Download `HellKnight.ipa` from the repo's **Releases → latest** page, then sid
 
 Requires iOS 15 or later.
 
+## Character art
+
+Characters are 2D skeletal rigs drawn in an ink style. They are rendered to animated sprite sheets in `HellKnight/Sprites/` by the generator in `tools/spritegen/`. To regenerate the sheets after changing a rig:
+
+```sh
+pip install skia-python numpy pillow
+cd tools/spritegen && python build.py ../..
+```
+
 ## Building locally (macOS)
 
 ```sh

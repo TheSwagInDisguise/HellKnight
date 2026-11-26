@@ -53,8 +53,8 @@ extension GameScene {
         player = p
         camBase = clampCam(isoProject(p.position))
         cam.position = camBase
-        let ghost = SKSpriteNode(texture: Tex.knight(), size: Player.bodySize)
-        ghost.anchorPoint = Player.bodyAnchor
+        let ghost = SKSpriteNode(texture: p.body.texture, size: p.body.size)
+        ghost.anchorPoint = p.body.anchorPoint
         ghost.color = Ink.bone
         ghost.colorBlendFactor = 1
         ghost.alpha = 0.45

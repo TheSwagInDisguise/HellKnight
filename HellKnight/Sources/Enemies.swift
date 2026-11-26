@@ -98,6 +98,7 @@ class Enemy: SKNode {
     /// Switch this enemy to an animated sprite sheet.
     func useSheet(_ info: SheetInfo, scale k: CGFloat = 1) {
         let sheet = SpriteSheet.get(info)
+        let k = k * (self is Boss ? 1.05 : 1.18)
         sprite.size = CGSize(width: info.frame.width * k, height: info.frame.height * k)
         sprite.anchorPoint = info.anchor
         animator = Animator(sheet: sheet, sprite: sprite)

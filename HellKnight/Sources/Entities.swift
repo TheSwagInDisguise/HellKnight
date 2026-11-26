@@ -46,7 +46,9 @@ final class Player: SKNode {
         self.weapon = weapon
         let info = Player.sheetInfo(weapon)
         let sheet = SpriteSheet.get(info)
-        let b = SKSpriteNode(texture: sheet.frames("idle").first, size: info.frame)
+        // Characters render 20% larger than their rig size so they read clearly in the arena.
+        let b = SKSpriteNode(texture: sheet.frames("idle").first,
+                             size: CGSize(width: info.frame.width * 1.2, height: info.frame.height * 1.2))
         b.anchorPoint = info.anchor
         body = b
         anim = Animator(sheet: sheet, sprite: b)

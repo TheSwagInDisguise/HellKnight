@@ -1,6 +1,8 @@
 # HellKnight
 
-An action roguelike for iOS, written in Swift with SpriteKit. Fight your way out of a burning underworld, one chamber at a time. All art and sound effects are generated in code, so the project has no external assets.
+An isometric action roguelike for iOS, written in Swift with SpriteKit. Fight your way out of a burning underworld, one chamber at a time.
+
+The game is drawn in a dark gothic ink-engraving style: bone-white and black linework with hatched shading, and blood-red accents. Each area adds its own glow color. Menus use ornate gilded frames, and boons are offered on tarot-style cards. All art and sound effects are generated in code, so the project has no external assets.
 
 ## Features
 

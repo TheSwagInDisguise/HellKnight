@@ -237,6 +237,7 @@ final class Room {
     var pillars: [Pillar] = []
     var doorSlots: [Int] = []
     var marks: [Mark] = []
+    var blockCenters: [CGPoint] = []
     private var flow: [Int] = []
 
     init(template: [String], type: RoomType, mirror: Bool) {
@@ -267,6 +268,11 @@ final class Room {
                 default:
                     break
                 }
+            }
+        }
+        for r in 0..<rows {
+            for c in 0..<cols where cells[r * cols + c] == .block {
+                blockCenters.append(center(c, r))
             }
         }
         // Door slots: pairs of "DD" on the top row; the slot is the left cell of the pair.

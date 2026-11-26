@@ -42,6 +42,7 @@ final class GameScene: BaseScene {
     var spikeClock: CGFloat = 0
     var hazardTick: CGFloat = 0
     var flowTimer: CGFloat = 0
+    var playerGhost: SKSpriteNode?
     var shotTimer: CGFloat = 0
 
     init(size: CGSize, runData: RunState) {

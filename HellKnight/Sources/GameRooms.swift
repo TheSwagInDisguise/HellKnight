@@ -53,6 +53,14 @@ extension GameScene {
         player = p
         camBase = clampCam(isoProject(p.position))
         cam.position = camBase
+        let ghost = SKSpriteNode(texture: Tex.knight(), size: Player.bodySize)
+        ghost.anchorPoint = Player.bodyAnchor
+        ghost.color = Ink.bone
+        ghost.colorBlendFactor = 1
+        ghost.alpha = 0.45
+        ghost.isHidden = true
+        topLayer.addChild(ghost)
+        playerGhost = ghost
         room.computeFlow(to: p.position)
 
         makeDoors(pal)

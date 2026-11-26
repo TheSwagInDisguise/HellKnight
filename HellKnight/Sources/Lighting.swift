@@ -66,6 +66,22 @@ extension GameScene {
         l.run(.sequence([.fadeOut(withDuration: TimeInterval(duration)), .removeFromParent()]))
     }
 
+    /// True when a tall block or pillar stands between the camera and the player.
+    func playerOccluded() -> Bool {
+        guard let p = player?.position, let room = room else { return false }
+        let sp = isoProject(p)
+        var tall = room.blockCenters
+        for pl in room.pillars where pl.blocksShots { tall.append(pl.pos) }
+        for q in tall {
+            if q.x + q.y >= p.x + p.y { continue }
+            let sq = isoProject(q)
+            if abs(sq.x - sp.x) > 56 { continue }
+            let dy = sp.y - sq.y
+            if dy > 0 && dy < 120 { return true }
+        }
+        return false
+    }
+
     func addFog() {
         guard let room = room else { return }
         let pal = Palette.of(runData.depth)
@@ -94,6 +110,13 @@ extension GameScene {
         lightBase.size = CGSize(width: size.width * cam.xScale * 1.5, height: size.height * cam.yScale * 1.5)
         if let p = player, let l = playerLight {
             l.position = screenPoint(p.position, height: 50)
+        }
+        if let p = player, let g = playerGhost {
+            g.isHidden = !playerOccluded()
+            if !g.isHidden {
+                g.position = screenPoint(p.position) + p.body.position
+                g.xScale = p.body.xScale
+            }
         }
         for pr in projectiles {
             pr.light?.position = screenPoint(pr.position, height: 26)

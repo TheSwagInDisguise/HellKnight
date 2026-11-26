@@ -39,6 +39,7 @@ extension GameScene {
                 p.afterimageTimer = 0.025
                 afterimage()
             }
+            p.animate(dt)
             if p.dashTime <= 0 { endDash() }
         } else {
             let mv = moveInput

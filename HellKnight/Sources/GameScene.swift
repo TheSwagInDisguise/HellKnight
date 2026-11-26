@@ -43,6 +43,7 @@ final class GameScene: BaseScene {
     var hazardTick: CGFloat = 0
     var flowTimer: CGFloat = 0
     var playerGhost: SKSpriteNode?
+    var shakeTime: CGFloat = 0
     var shotTimer: CGFloat = 0
 
     init(size: CGSize, runData: RunState) {
@@ -85,7 +86,7 @@ final class GameScene: BaseScene {
 
     func layoutUI() {
         // Camera children (the HUD) are not affected by camera scale, so the HUD stays at 1:1.
-        camBaseScale = clamp(600 / max(size.height, 1), 0.75, 1.7)
+        camBaseScale = clamp(545 / max(size.height, 1), 0.72, 1.6)
         cam.setScale(camBaseScale)
         let insets = view?.safeAreaInsets ?? .zero
         hud.layout(size, insets)
@@ -174,18 +175,24 @@ final class GameScene: BaseScene {
 
     func updateCamera(_ dt: CGFloat) {
         guard let p = player else { return }
-        let target = clampCam(isoProject(p.position) + CGPoint(x: 0, y: 40))
-        camBase = camBase + (target - camBase) * min(1, dt * 7)
+        // Look slightly ahead of where the player is heading; ease with a frame-rate independent spring.
+        let ahead = isoProject(moveInput * 70)
+        let target = clampCam(isoProject(p.position) + CGPoint(x: 0, y: 40) + ahead)
+        camBase = camBase + (target - camBase) * (1 - exp(-dt * 6.5))
         var off = CGPoint.zero
+        shakeTime += dt
         if shakeAmt > 0.2 {
-            off = CGPoint(x: rnd(-shakeAmt, shakeAmt), y: rnd(-shakeAmt, shakeAmt))
-            shakeAmt *= max(0, 1 - dt * 10)
+            // Smooth rolling shake instead of per-frame random jitter.
+            let t = shakeTime
+            off = CGPoint(x: (sin(t * 61) + sin(t * 37 + 1.3)) * 0.5 * shakeAmt,
+                          y: (sin(t * 53 + 2.1) + sin(t * 29)) * 0.5 * shakeAmt)
+            shakeAmt *= exp(-dt * 9)
         } else {
             shakeAmt = 0
         }
         cam.position = camBase + off
         if zoomPunch > 0.001 {
-            zoomPunch *= max(0, 1 - dt * 9)
+            zoomPunch *= exp(-dt * 9)
             cam.setScale(camBaseScale * (1 - zoomPunch))
         } else if zoomPunch != 0 {
             zoomPunch = 0

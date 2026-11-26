@@ -8,6 +8,10 @@ final class Player: SKNode {
     let weapon: WeaponKind
     let up = Billboard()
     let body: SKSpriteNode
+    let cape = SKSpriteNode(texture: Tex.knightCape(), size: Player.bodySize)
+    var capeAngle: CGFloat = 0
+    var lean: CGFloat = 0
+    var idleTime: CGFloat = 0
     let pivot = SKNode()
     let weaponSprite: SKSpriteNode
     let weaponBase: CGPoint
@@ -38,7 +42,7 @@ final class Player: SKNode {
 
     init(weapon: WeaponKind) {
         self.weapon = weapon
-        let b = SKSpriteNode(texture: Tex.knight(), size: Player.bodySize)
+        let b = SKSpriteNode(texture: Tex.knightBody(), size: Player.bodySize)
         b.anchorPoint = Player.bodyAnchor
         body = b
         let wt = Tex.weapon(weapon)
@@ -73,6 +77,11 @@ final class Player: SKNode {
         pivot.addChild(weaponSprite)
         up.addChild(pivot)
         up.addChild(body)
+        // Cape hangs from the shoulders (y=30 of 84 in the texture) and sways behind the body.
+        cape.anchorPoint = CGPoint(x: 0.5, y: (84 - 30) / 84)
+        cape.position = CGPoint(x: 0, y: 84 * (1 - Player.bodyAnchor.y) - 30)
+        cape.zPosition = -0.5
+        body.addChild(cape)
         setFacing(.pi / 4)
     }
 
@@ -123,17 +132,26 @@ final class Player: SKNode {
     }
 
     func animate(_ dt: CGFloat) {
-        if moving {
-            walkPhase += dt * 14
-            body.position = CGPoint(x: 0, y: abs(sin(walkPhase)) * 3)
-            body.zRotation = sin(walkPhase) * 0.05
-            if body.action(forKey: "squash") == nil { body.yScale = 1 }
+        idleTime += dt
+        let k = 1 - exp(-dt * 12)
+        let facingSign: CGFloat = body.xScale < 0 ? -1 : 1
+        let dashing = dashTime > 0
+        if moving || dashing {
+            walkPhase += dt * (dashing ? 0 : 14)
+            body.position = CGPoint(x: 0, y: dashing ? 2 : abs(sin(walkPhase)) * 3.5)
+            lean += ((dashing ? -0.16 : -0.07) - lean) * k
+            if body.action(forKey: "squash") == nil { body.yScale = dashing ? 0.93 : 1 + abs(cos(walkPhase)) * 0.015 }
         } else {
-            walkPhase += dt * 2.6
             body.position = .zero
-            body.zRotation = 0
-            if body.action(forKey: "squash") == nil { body.yScale = 1 + sin(walkPhase) * 0.022 }
+            lean += (0 - lean) * k
+            if body.action(forKey: "squash") == nil { body.yScale = 1 + sin(idleTime * 2.6) * 0.022 }
         }
+        body.zRotation = (lean + (moving ? sin(walkPhase) * 0.035 : 0)) * facingSign
+        // Cape trails behind when moving and flutters, eased so it never snaps.
+        let capeTarget: CGFloat = dashing ? -0.55 : (moving ? -0.28 + sin(walkPhase * 0.9) * 0.07 : sin(idleTime * 1.7) * 0.035)
+        capeAngle += (capeTarget - capeAngle) * (1 - exp(-dt * 8))
+        cape.zRotation = capeAngle - lean * 0.5
+        cape.xScale = 1 + (moving ? 0.04 : 0)
         if invuln > 0 && dashTime <= 0 {
             body.alpha = sin(invuln * 40) > 0 ? 0.45 : 1
         } else {

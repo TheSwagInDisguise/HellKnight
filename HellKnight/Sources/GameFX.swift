@@ -44,9 +44,11 @@ extension GameScene {
             let l = life * rnd(0.6, 1.2)
             let d = isoProject(CGPoint(angle: rnd(0, 2 * .pi), length: v * l))
             let rise = rnd(10, 40) * l * 2
+            let mv = SKAction.moveBy(x: d.x, y: d.y + rise, duration: TimeInterval(l))
+            mv.timingMode = .easeOut
             s.run(.sequence([
                 .group([
-                    .moveBy(x: d.x, y: d.y + rise, duration: TimeInterval(l)),
+                    mv,
                     .fadeOut(withDuration: TimeInterval(l)),
                     .scale(to: 0.2, duration: TimeInterval(l)),
                 ]),
@@ -83,7 +85,9 @@ extension GameScene {
         r.zPosition = 8
         r.setScale(0.2)
         world.addChild(r)
-        r.run(.sequence([.group([.scale(to: 1.05, duration: 0.22), .fadeOut(withDuration: 0.3)]), .removeFromParent()]))
+        let grow = SKAction.scale(to: 1.05, duration: 0.26)
+        grow.timingMode = .easeOut
+        r.run(.sequence([.group([grow, .fadeOut(withDuration: 0.32)]), .removeFromParent()]))
     }
 
     func damageNumber(_ v: CGFloat, at p: CGPoint, height: CGFloat, color: UIColor, crit: Bool) {
@@ -96,12 +100,14 @@ extension GameScene {
         sh.zPosition = -0.1
         l.addChild(sh)
         topLayer.addChild(l)
-        if crit {
-            l.setScale(1.6)
-            l.run(.scale(to: 1, duration: 0.15))
-        }
+        let pop = SKAction.scale(to: 1, duration: crit ? 0.18 : 0.12)
+        pop.timingMode = .easeOut
+        l.setScale(crit ? 1.7 : 1.3)
+        l.run(pop)
+        let rise = SKAction.moveBy(x: rnd(-8, 8), y: 40, duration: 0.65)
+        rise.timingMode = .easeOut
         l.run(.sequence([
-            .group([.moveBy(x: 0, y: 36, duration: 0.6), .sequence([.wait(forDuration: 0.3), .fadeOut(withDuration: 0.3)])]),
+            .group([rise, .sequence([.wait(forDuration: 0.35), .fadeOut(withDuration: 0.3)])]),
             .removeFromParent(),
         ]))
     }
@@ -115,8 +121,10 @@ extension GameScene {
         sh.zPosition = -0.1
         l.addChild(sh)
         topLayer.addChild(l)
+        let up = SKAction.moveBy(x: 0, y: 40, duration: 1.0)
+        up.timingMode = .easeOut
         l.run(.sequence([
-            .group([.moveBy(x: 0, y: 40, duration: 1.0), .sequence([.wait(forDuration: 0.6), .fadeOut(withDuration: 0.4)])]),
+            .group([up, .sequence([.wait(forDuration: 0.6), .fadeOut(withDuration: 0.4)])]),
             .removeFromParent(),
         ]))
     }

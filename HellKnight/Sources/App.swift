@@ -27,7 +27,8 @@ final class GameViewController: UIViewController {
         guard let skView = view as? SKView else { return }
         skView.isMultipleTouchEnabled = true
         skView.ignoresSiblingOrder = true
-        skView.preferredFramesPerSecond = 60
+        // 120 Hz on ProMotion displays; game logic is time-based so it runs the same at any rate.
+        skView.preferredFramesPerSecond = UIScreen.main.maximumFramesPerSecond
         skView.backgroundColor = .black
         Audio.shared.start()
     }

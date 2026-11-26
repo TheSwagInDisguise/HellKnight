@@ -34,6 +34,9 @@ class Enemy: SKNode {
     var light: SKSpriteNode?
     var bobPhase = CGFloat.random(in: 0...6)
     var spriteScale: CGFloat = 1
+    var lastPos = CGPoint.zero
+    var walkPhase = CGFloat.random(in: 0...6)
+    var walkAmount: CGFloat = 0
 
     let up = Billboard()
     let sprite: SKSpriteNode
@@ -143,6 +146,19 @@ class Enemy: SKNode {
         }
         bobPhase += dt * 3
         sprite.yScale = spriteScale * (1 + sin(bobPhase) * 0.03)
+        // Walk cycle: bounce and sway in proportion to actual movement, eased in and out.
+        let speedNow = dt > 0 ? position.distance(to: lastPos) / dt : 0
+        lastPos = position
+        let target: CGFloat = speedNow > 25 ? 1 : 0
+        walkAmount += (target - walkAmount) * (1 - exp(-dt * 10))
+        walkPhase += dt * 11 * walkAmount
+        let inLeap = (self as? Boss)?.pattern == .leap
+        if !(self is Wisp) && !inLeap {
+            sprite.position = CGPoint(x: 0, y: abs(sin(walkPhase)) * 3.5 * walkAmount)
+            if sprite.action(forKey: "tilt") == nil {
+                sprite.zRotation = sin(walkPhase) * 0.07 * walkAmount
+            }
+        }
         position = game.room.resolve(position, radius)
         zPosition = game.depthZ(position)
     }

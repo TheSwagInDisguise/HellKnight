@@ -11,10 +11,14 @@ enum Tex {
     static let segRise: CGFloat = 128 * isoK * 0.5
     static let wallH: CGFloat = 150
 
+    /// Art is rendered at the device's native pixel density (3× on modern iPhones) for crisp edges.
+    static let renderScale: CGFloat = max(2, min(3, UIScreen.main.scale))
+
     static func make(_ key: String, _ w: CGFloat, _ h: CGFloat, _ draw: (CGContext) -> Void) -> SKTexture {
         if let t = cache[key] { return t }
         let format = UIGraphicsImageRendererFormat.default()
-        format.scale = 2
+        // Very large textures (full-screen panels, vignettes) stay at 2× to save memory.
+        format.scale = w * h > 250_000 ? 2 : renderScale
         format.opaque = false
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: max(1, w), height: max(1, h)), format: format)
         let image = renderer.image { ctx in draw(ctx.cgContext) }
@@ -449,14 +453,33 @@ enum Tex {
 
     // MARK: - Player & weapons (upright, facing right)
 
+    /// Full knight (with cape) for title art, afterimages and silhouettes.
     static func knight() -> SKTexture {
         make("knight", 64, 84) { c in
-            // cape
-            let cape = P([(19, 30), (45, 30), (54, 79), (47, 75), (40, 81), (32, 76), (24, 81), (17, 75), (10, 79)])
-            shade(c, cape)
-            hatch(c, cape, spacing: 4, angle: 1.3, color: Ink.boneDark.withAlphaComponent(0.18))
-            line(c, [CGPoint(x: 10, y: 79), CGPoint(x: 17, y: 75), CGPoint(x: 24, y: 81), CGPoint(x: 32, y: 76),
-                     CGPoint(x: 40, y: 81), CGPoint(x: 47, y: 75), CGPoint(x: 54, y: 79)], Ink.blood, 1.6)
+            drawCape(c)
+            drawKnightBody(c)
+        }
+    }
+
+    /// The knight without the cape; the cape is a separate sprite so it can sway.
+    static func knightBody() -> SKTexture {
+        make("knightBody", 64, 84) { c in drawKnightBody(c) }
+    }
+
+    static func knightCape() -> SKTexture {
+        make("knightCape", 64, 84) { c in drawCape(c) }
+    }
+
+    private static func drawCape(_ c: CGContext) {
+        let cape = P([(19, 30), (45, 30), (54, 79), (47, 75), (40, 81), (32, 76), (24, 81), (17, 75), (10, 79)])
+        shade(c, cape)
+        hatch(c, cape, spacing: 4, angle: 1.3, color: Ink.boneDark.withAlphaComponent(0.18))
+        line(c, [CGPoint(x: 10, y: 79), CGPoint(x: 17, y: 75), CGPoint(x: 24, y: 81), CGPoint(x: 32, y: 76),
+                 CGPoint(x: 40, y: 81), CGPoint(x: 47, y: 75), CGPoint(x: 54, y: 79)], Ink.blood, 1.6)
+    }
+
+    private static func drawKnightBody(_ c: CGContext) {
+        do {
             // legs
             let l1 = P([(24, 60), (31, 60), (30, 80), (21, 80)])
             let l2 = P([(34, 60), (41, 60), (43, 80), (34, 80)])

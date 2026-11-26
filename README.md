@@ -34,6 +34,7 @@ The game is drawn in a dark gothic ink-engraving style: bone-white and black lin
   - Ossuary Wastes
   - Abyssal Throne
 - **Enemies:** imps (lunge at you), bone archers (shoot), brutes (charge), wisps (explode) and hex priests (fire bullet rings). Elite versions appear in deeper levels.
+- **Vows.** Before a run you can take optional curses in the Sanctum, such as foes dealing more damage, extra foes, tougher bosses or pricier shops. Each one adds Heat, and every point of Heat earns +15% Soul Shards. Your highest Heat escape is recorded.
 - **Meta-progression.** Soul Shards are kept when you die. Spend them at the *Altar of Embers* in the Sanctum hub on max health, damage, speed, extra dashes, revives and more.
 
 ## Controls (landscape)

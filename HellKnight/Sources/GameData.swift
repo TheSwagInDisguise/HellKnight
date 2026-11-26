@@ -306,6 +306,48 @@ enum MetaUpgrade: String, CaseIterable {
     }
 }
 
+// MARK: - Vows (optional difficulty modifiers that raise Heat and soul rewards)
+
+enum Vow: String, CaseIterable {
+    case pain, horde, iron, haste, frailty, fury, scarcity, chosen
+
+    var title: String {
+        switch self {
+        case .pain: return "Vow of Pain"
+        case .horde: return "Vow of the Horde"
+        case .iron: return "Vow of Iron"
+        case .haste: return "Vow of Haste"
+        case .frailty: return "Vow of Frailty"
+        case .fury: return "Vow of Fury"
+        case .scarcity: return "Vow of Scarcity"
+        case .chosen: return "Vow of the Chosen"
+        }
+    }
+
+    var maxRank: Int {
+        switch self {
+        case .pain, .horde, .frailty, .chosen: return 2
+        case .iron: return 3
+        case .haste, .fury, .scarcity: return 1
+        }
+    }
+
+    var heatPerRank: Int { self == .fury ? 2 : 1 }
+
+    var effect: String {
+        switch self {
+        case .pain: return "Foes deal +25% damage per rank"
+        case .horde: return "More foes in every wave per rank"
+        case .iron: return "Foes have +20% health per rank"
+        case .haste: return "Foes move 15% faster"
+        case .frailty: return "-20 max health per rank"
+        case .fury: return "Bosses: +25% health, enrage at 75%"
+        case .scarcity: return "Shop prices +40%, no shop healing"
+        case .chosen: return "+20% chance of elite foes per rank"
+        }
+    }
+}
+
 struct MetaData: Codable {
     var souls: Int = 0
     var ranks: [String: Int] = [:]
@@ -313,6 +355,23 @@ struct MetaData: Codable {
     var wins: Int = 0
     var bestDepth: Int = 0
     var weapon: Int = 0
+    var vows: [String: Int] = [:]
+    var bestHeat: Int = 0
+
+    init() {}
+
+    // Tolerant decoding so older saves keep working when fields are added.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        souls = try c.decodeIfPresent(Int.self, forKey: .souls) ?? 0
+        ranks = try c.decodeIfPresent([String: Int].self, forKey: .ranks) ?? [:]
+        runs = try c.decodeIfPresent(Int.self, forKey: .runs) ?? 0
+        wins = try c.decodeIfPresent(Int.self, forKey: .wins) ?? 0
+        bestDepth = try c.decodeIfPresent(Int.self, forKey: .bestDepth) ?? 0
+        weapon = try c.decodeIfPresent(Int.self, forKey: .weapon) ?? 0
+        vows = try c.decodeIfPresent([String: Int].self, forKey: .vows) ?? [:]
+        bestHeat = try c.decodeIfPresent(Int.self, forKey: .bestHeat) ?? 0
+    }
 }
 
 final class Meta {
@@ -336,6 +395,18 @@ final class Meta {
     }
 
     func rank(_ u: MetaUpgrade) -> Int { data.ranks[u.rawValue] ?? 0 }
+
+    func vowRank(_ v: Vow) -> Int { min(v.maxRank, max(0, data.vows[v.rawValue] ?? 0)) }
+
+    func setVow(_ v: Vow, _ rank: Int) {
+        data.vows[v.rawValue] = min(v.maxRank, max(0, rank))
+        save()
+    }
+
+    var heat: Int { Vow.allCases.reduce(0) { $0 + vowRank($1) * $1.heatPerRank } }
+
+    /// Soul Shard multiplier from Heat.
+    static func heatMult(_ heat: Int) -> CGFloat { 1 + 0.15 * CGFloat(heat) }
 
     @discardableResult
     func buy(_ u: MetaUpgrade) -> Bool {
@@ -412,6 +483,15 @@ final class RunState {
     var damageTakenMult: CGFloat = 1
     var enemyHpMult: CGFloat = 1
     var lastSpecial: Reward?
+    // Vows
+    var heat = 0
+    var enemyDmgMult: CGFloat = 1
+    var enemySpeedMult: CGFloat = 1
+    var hordeBonus = 0
+    var eliteBonus: CGFloat = 0
+    var priceMult: CGFloat = 1
+    var bossFury = false
+    var scarcity = false
 
     init(weapon: WeaponKind) {
         let meta = Meta.shared
@@ -426,6 +506,17 @@ final class RunState {
         gold = 30 * meta.rank(.greed)
         revives = meta.rank(.rebirth)
         nextReward = .boon(Patron.allCases.randomElement() ?? .pyre)
+        heat = meta.heat
+        enemyDmgMult = 1 + 0.25 * CGFloat(meta.vowRank(.pain))
+        hordeBonus = 2 * meta.vowRank(.horde)
+        enemyHpMult = 1 + 0.2 * CGFloat(meta.vowRank(.iron))
+        enemySpeedMult = 1 + 0.15 * CGFloat(meta.vowRank(.haste))
+        maxHp = max(30, maxHp - 20 * CGFloat(meta.vowRank(.frailty)))
+        hp = maxHp
+        bossFury = meta.vowRank(.fury) > 0
+        scarcity = meta.vowRank(.scarcity) > 0
+        priceMult = scarcity ? 1.4 : 1
+        eliteBonus = 0.2 * CGFloat(meta.vowRank(.chosen))
     }
 
     var roomType: RoomType {

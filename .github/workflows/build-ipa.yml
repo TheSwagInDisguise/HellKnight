@@ -130,7 +130,7 @@ jobs:
           APP=simbuild/Build/Products/Debug-iphonesimulator/HellKnight.app
           xcrun simctl install "$UDID" "$APP"
           mkdir -p shots
-          for s in title sanctum game boon game1 game2 boss rest altar; do
+          for s in title sanctum vows game boon game1 game2 boss rest altar; do
             xcrun simctl launch "$UDID" com.hellknight.game -shot "$s"
             sleep 10
             xcrun simctl io "$UDID" screenshot "shots/$s.png"

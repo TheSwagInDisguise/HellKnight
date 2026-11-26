@@ -509,6 +509,7 @@ final class Boss: Enemy {
     var hitDone = false
     var phase2 = false
     var contactCD: CGFloat = 0
+    var enrageAt: CGFloat = 0.5
     var leapFrom = CGPoint.zero
     var leapTo = CGPoint.zero
     var farTime: CGFloat = 0
@@ -545,7 +546,7 @@ final class Boss: Enemy {
             contactCD = 0.8
             game.hurtPlayer(12 * dmgMult, from: position)
         }
-        if !phase2 && hp < maxHp * 0.5 {
+        if !phase2 && hp < maxHp * enrageAt {
             phase2 = true
             game.hud.banner(shortName, "is enraged!", color: color)
             sfx(.roar)

@@ -401,7 +401,10 @@ extension GameScene {
         stats.position = CGPoint(x: 0, y: ph / 2 - 136)
         stats.zPosition = 2
         o.addChild(stats)
-        let tip = makeLabel("Spend Soul Shards at the Altar of Embers to grow stronger.", size: 13,
+        let tipText = runData.heat > 0
+            ? "Heat \(runData.heat) Vows multiplied your Soul Shards by \(String(format: "%.2f", Meta.heatMult(runData.heat)))x."
+            : "Spend Soul Shards at the Altar of Embers, or take Vows for greater rewards."
+        let tip = makeLabel(tipText, size: 13,
                             color: Ink.boneDark, font: Font.medium)
         tip.position = CGPoint(x: 0, y: ph / 2 - 160)
         tip.zPosition = 2

@@ -204,7 +204,9 @@ final class GameScene: BaseScene {
         guard !runRecorded else { return }
         runRecorded = true
         let meta = Meta.shared
+        runData.souls = Int((CGFloat(runData.souls) * Meta.heatMult(runData.heat)).rounded())
         meta.data.souls += runData.souls
+        if won { meta.data.bestHeat = max(meta.data.bestHeat, runData.heat) }
         meta.data.runs += 1
         if won { meta.data.wins += 1 }
         meta.data.bestDepth = max(meta.data.bestDepth, runData.depth + 1)

@@ -11,12 +11,13 @@ enum ShotMode {
         switch shot {
         case "title":
             return TitleScene(size: size)
-        case "sanctum":
+        case "sanctum", "vows":
             Meta.shared.data.souls = 240
             Meta.shared.data.ranks = ["vigor": 2, "might": 1, "rebirth": 1]
             Meta.shared.data.runs = 7
             Meta.shared.data.wins = 1
             Meta.shared.data.bestDepth = 3
+            Meta.shared.data.vows = ["pain": 1, "iron": 2, "fury": 1]
             return SanctumScene(size: size)
         default:
             let run = RunState(weapon: .blade)

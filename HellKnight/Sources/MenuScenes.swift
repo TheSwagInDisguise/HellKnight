@@ -113,6 +113,7 @@ final class TitleScene: BaseScene {
 // MARK: - Sanctum hub (meta progression + weapon select)
 
 final class SanctumScene: BaseScene {
+    var showVows = ShotMode.name == "vows"
 
     override func didMove(to view: SKView) {
         anchorPoint = CGPoint(x: 0.5, y: 0.5)
@@ -155,7 +156,11 @@ final class SanctumScene: BaseScene {
         souls.position = CGPoint(x: R - 24, y: T - 6)
         souls.zPosition = 10
         addChild(souls)
-        let stats = makeLabel("Descents \(meta.data.runs)  ·  Escapes \(meta.data.wins)  ·  Deepest \(meta.data.bestDepth)",
+        if showVows {
+            buildVows(W: W, H: H, T: T, B: B)
+            return
+        }
+        let stats = makeLabel("Descents \(meta.data.runs)  ·  Escapes \(meta.data.wins)  ·  Best Heat \(meta.data.bestHeat)",
                               size: 12, color: Ink.boneDark, font: Font.medium, align: .left)
         stats.position = CGPoint(x: L, y: T - 6)
         stats.zPosition = 10
@@ -204,7 +209,7 @@ final class SanctumScene: BaseScene {
             addChild(b)
         }
         let blurbTop = panelTop - 46 - 3 * (bh + 6) + bh / 2 - 6
-        let blurb = makeLabel(selected.blurb, size: 13, color: Ink.bone.withAlphaComponent(0.85), font: Font.medium)
+        let blurb = makeLabel(selected.blurb, size: 12, color: Ink.bone.withAlphaComponent(0.85), font: Font.medium)
         blurb.numberOfLines = 0
         blurb.preferredMaxLayoutWidth = colW - 30
         blurb.verticalAlignmentMode = .top
@@ -219,6 +224,17 @@ final class SanctumScene: BaseScene {
         start.zPosition = 10
         addChild(start)
         start.run(.repeatForever(.sequence([.scale(to: 1.03, duration: 0.8), .scale(to: 1, duration: 0.8)])))
+
+        let heat = meta.heat
+        let vowText = heat > 0 ? "Vows · Heat \(heat) · Souls ×\(String(format: "%.2f", Meta.heatMult(heat)))" : "Vows · Heat 0"
+        let vows = Button(vowText, size: CGSize(width: colW - 30, height: 32), accent: heat > 0 ? UIColor(hex: 0xff7a2a) : nil,
+                          fontSize: 13) { [weak self] in
+            self?.showVows = true
+            self?.build()
+        }
+        vows.position = CGPoint(x: leftX, y: B + 80)
+        vows.zPosition = 10
+        addChild(vows)
 
         // Right: Altar of Embers
         let h2 = makeLabel("ALTAR OF EMBERS", size: 12, color: Ink.boneDark, font: Font.bold, kern: 3)
@@ -269,6 +285,91 @@ final class SanctumScene: BaseScene {
             b.zPosition = 10
             addChild(b)
         }
+    }
+
+    func buildVows(W: CGFloat, H: CGFloat, T: CGFloat, B: CGFloat) {
+        let meta = Meta.shared
+        let pw = min(640, W - 60)
+        let ph = T - B - 30
+        let cy = B + ph / 2
+        let panel = SKSpriteNode(texture: Tex.panel(pw, ph, fillAlpha: 0.85), size: CGSize(width: pw + 8, height: ph + 8))
+        panel.position = CGPoint(x: 0, y: cy)
+        panel.zPosition = 5
+        addChild(panel)
+
+        let heat = meta.heat
+        let head = makeLabel("VOWS OF TORMENT", size: 13, color: UIColor(hex: 0xff8a50), font: Font.bold, kern: 3)
+        head.position = CGPoint(x: -pw / 2 + 20, y: cy + ph / 2 - 20)
+        head.horizontalAlignmentMode = .left
+        head.zPosition = 10
+        addChild(head)
+        let summary = makeLabel("Heat \(heat)  ·  Soul Shards ×\(String(format: "%.2f", Meta.heatMult(heat)))", size: 14,
+                                color: Ink.bone, font: Font.heavy, align: .right)
+        summary.position = CGPoint(x: pw / 2 - 20, y: cy + ph / 2 - 20)
+        summary.zPosition = 10
+        addChild(summary)
+
+        let vows = Vow.allCases
+        let top = cy + ph / 2 - 40
+        let bottom = B + 56
+        let rowH = min(36, (top - bottom) / CGFloat(vows.count))
+        let inner = pw - 40
+        for (i, v) in vows.enumerated() {
+            let y = top - rowH * (CGFloat(i) + 0.5)
+            let rank = meta.vowRank(v)
+            if i > 0 {
+                let sep = SKSpriteNode(color: UIColor(white: 1, alpha: 0.07), size: CGSize(width: inner, height: 1))
+                sep.position = CGPoint(x: 0, y: y + rowH / 2)
+                sep.zPosition = 9
+                addChild(sep)
+            }
+            let name = makeLabel(v.title, size: min(14, rowH * 0.4), color: rank > 0 ? UIColor(hex: 0xff9a60) : Ink.bone,
+                                 font: Font.bold, align: .left)
+            name.position = CGPoint(x: -inner / 2, y: y + rowH * 0.16)
+            name.zPosition = 10
+            addChild(name)
+            let eff = makeLabel(v.effect + (v.heatPerRank > 1 ? "  (2 Heat)" : ""), size: min(11.5, rowH * 0.31),
+                                color: Ink.boneDark, font: Font.medium, align: .left)
+            eff.position = CGPoint(x: -inner / 2, y: y - rowH * 0.2)
+            eff.zPosition = 10
+            addChild(eff)
+            let bw: CGFloat = 34
+            for r in 0..<v.maxRank {
+                let pip = SKSpriteNode(texture: Tex.gem(r < rank ? 0xff7a2a : 0x3a3030), size: CGSize(width: 10, height: 10))
+                pip.position = CGPoint(x: inner / 2 - bw * 2 - 20 - CGFloat(v.maxRank - 1 - r) * 12, y: y)
+                pip.zPosition = 10
+                addChild(pip)
+            }
+            let minus = Button("−", size: CGSize(width: bw, height: max(22, rowH - 10)), fontSize: 16) { [weak self] in
+                meta.setVow(v, rank - 1)
+                self?.build()
+            }
+            minus.enabled = rank > 0
+            minus.position = CGPoint(x: inner / 2 - bw * 1.5 - 6, y: y)
+            minus.zPosition = 10
+            addChild(minus)
+            let plus = Button("+", size: CGSize(width: bw, height: max(22, rowH - 10)), accent: UIColor(hex: 0xff7a2a), fontSize: 16) { [weak self] in
+                meta.setVow(v, rank + 1)
+                sfx(.roar, 0.3)
+                self?.build()
+            }
+            plus.enabled = rank < v.maxRank
+            plus.position = CGPoint(x: inner / 2 - bw / 2, y: y)
+            plus.zPosition = 10
+            addChild(plus)
+        }
+
+        let done = Button("Done", size: CGSize(width: 180, height: 38), accent: Ink.blood, fontSize: 15) { [weak self] in
+            self?.showVows = false
+            self?.build()
+        }
+        done.position = CGPoint(x: 0, y: B + 26)
+        done.zPosition = 10
+        addChild(done)
+        let tip = makeLabel("Each point of Heat earns +15% Soul Shards", size: 11, color: Ink.boneDark, font: Font.medium, align: .left)
+        tip.position = CGPoint(x: -pw / 2 + 4, y: B + 26)
+        tip.zPosition = 10
+        if W > 700 { addChild(tip) }
     }
 
     func startRun() {

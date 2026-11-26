@@ -94,7 +94,7 @@ extension GameScene {
             makeShop()
             roomCleared = true
             openDoors()
-            healPlayer(runData.maxHp * 0.2)
+            if !runData.scarcity { healPlayer(runData.maxHp * 0.2) }
             hud.banner("The Ash Merchant", "Walk over an item to buy it", color: Ink.gold)
         case .rest:
             roomCleared = true
@@ -604,7 +604,7 @@ extension GameScene {
         items.append(contentsOf: extra.prefix(2))
         let c = CGPoint(x: room.bounds.midX, y: room.bounds.midY + 20)
         for (i, it) in items.enumerated() {
-            let pk = Pickup(reward: it.0, price: it.1, depth: d)
+            let pk = Pickup(reward: it.0, price: Int((CGFloat(it.1) * runData.priceMult).rounded()), depth: d)
             pk.position = c + CGPoint(x: (CGFloat(i) - 1) * 170, y: -(CGFloat(i) - 1) * 170)
             pk.zPosition = depthZ(pk.position)
             world.addChild(pk)
@@ -637,7 +637,7 @@ extension GameScene {
         }
         var result: [[EnemyKind]] = []
         for wi in 0..<count {
-            var budget = 3 + d * 2 + r / 2 + wi + (elite ? 1 : 0)
+            var budget = 3 + d * 2 + r / 2 + wi + (elite ? 1 : 0) + runData.hordeBonus
             var wave: [EnemyKind] = []
             var guardCount = 0
             while budget > 0 && guardCount < 50 {
@@ -705,8 +705,14 @@ extension GameScene {
         case .boss: e = Boss(depth: d)
         }
         e.maxHp *= runData.enemyHpMult
+        e.dmgMult *= runData.enemyDmgMult
+        e.baseSpeed *= runData.enemySpeedMult
+        if let b = e as? Boss, runData.bossFury {
+            e.maxHp *= 1.25
+            b.enrageAt = 0.75
+        }
         e.hp = e.maxHp
-        if k != .boss && (runData.isEliteRoom || chance(0.04 + 0.08 * CGFloat(d) + 0.02 * CGFloat(runData.room))) {
+        if k != .boss && (runData.isEliteRoom || chance(0.04 + 0.08 * CGFloat(d) + 0.02 * CGFloat(runData.room) + runData.eliteBonus)) {
             e.makeElite()
         }
         e.position = room.resolve(pos, e.radius)

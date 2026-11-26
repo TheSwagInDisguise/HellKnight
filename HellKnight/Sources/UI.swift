@@ -309,6 +309,7 @@ final class HUD: SKNode {
     let roomLabel = makeLabel("", size: 13, color: Ink.bone.withAlphaComponent(0.85), font: Font.title)
     let roomDivider = SKSpriteNode(texture: Tex.divider(220), size: CGSize(width: 220, height: 6))
     let bossNode = SKNode()
+    let scrim = SKSpriteNode(texture: Tex.scrim())
     static let bossW: CGFloat = 360
     var bossWidth: CGFloat { HUD.bossW }
     let bossFill: SKSpriteNode
@@ -335,6 +336,9 @@ final class HUD: SKNode {
     func setup() {
         vignette.zPosition = -10
         addChild(vignette)
+        scrim.zPosition = -8
+        scrim.anchorPoint = CGPoint(x: 0.5, y: 1)
+        addChild(scrim)
         hurt.alpha = 0
         hurt.zPosition = -9
         hurt.blendMode = .add
@@ -415,6 +419,8 @@ final class HUD: SKNode {
         let T = size.height / 2 - max(safe.top, 0) - 24
         vignette.size = CGSize(width: size.width * 1.08, height: size.height * 1.12)
         hurt.size = CGSize(width: size.width + 20, height: size.height + 20)
+        scrim.size = CGSize(width: size.width + 20, height: 110)
+        scrim.position = CGPoint(x: 0, y: size.height / 2)
         fadeNode.size = CGSize(width: size.width + 40, height: size.height + 40)
         heartMedal.position = CGPoint(x: L + 22, y: T)
         hpFrame.position = CGPoint(x: L + 30, y: T)
@@ -432,7 +438,7 @@ final class HUD: SKNode {
         soulLabel.position = CGPoint(x: R - 74, y: T - 22)
         roomLabel.position = CGPoint(x: 0, y: T + 2)
         roomDivider.position = CGPoint(x: 0, y: T - 11)
-        bossNode.position = CGPoint(x: 0, y: T - 52)
+        bossNode.position = CGPoint(x: 0, y: T - 22)
         bannerTitle.position = CGPoint(x: 0, y: size.height * 0.2)
         bannerShadow.position = CGPoint(x: 2, y: size.height * 0.2 - 2)
         bannerDivider.position = CGPoint(x: 0, y: size.height * 0.2 - 22)
@@ -474,6 +480,8 @@ final class HUD: SKNode {
         soulLabel.text = "\(run.souls)"
         if let b = boss, b.alive {
             bossNode.isHidden = false
+            roomLabel.isHidden = true
+            roomDivider.isHidden = true
             if bossName.name != b.bossName {
                 bossName.name = b.bossName
                 setKerned(bossName, b.bossName.uppercased(), kern: 2.5)
@@ -481,6 +489,8 @@ final class HUD: SKNode {
             bossFill.xScale = max(0, b.hp / b.maxHp)
         } else {
             bossNode.isHidden = true
+            roomLabel.isHidden = false
+            roomDivider.isHidden = false
         }
         var sig = ""
         for s in Slot.allCases { if let b = run.slots[s] { sig += "\(s.rawValue)\(b.patron.rawValue)\(b.rarity.rawValue)," } }

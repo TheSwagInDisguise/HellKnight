@@ -114,7 +114,7 @@ extension GameScene {
     private func makeOverlay() -> SKNode {
         let o = SKNode()
         o.zPosition = 500
-        let dim = SKSpriteNode(color: UIColor(white: 0, alpha: 0.78), size: CGSize(width: size.width + 60, height: size.height + 60))
+        let dim = SKSpriteNode(color: UIColor(white: 0, alpha: 0.9), size: CGSize(width: size.width + 60, height: size.height + 60))
         o.addChild(dim)
         let v = SKSpriteNode(texture: Tex.inkVignette(), size: CGSize(width: size.width * 1.05, height: size.height * 1.1))
         v.zPosition = 0.1
@@ -155,11 +155,11 @@ extension GameScene {
         let n = CGFloat(max(cards.count, 1))
         let gap: CGFloat = 16
         let cw = min(220, (W - 60 - (n - 1) * gap) / n)
-        let ch = min(300, H - 96)
+        let ch = min(250, H - 110)
         let small = cw < 190
         for (i, c) in cards.enumerated() {
             let x = (CGFloat(i) - (n - 1) / 2) * (cw + gap)
-            let b = Button("", size: CGSize(width: cw, height: ch), texture: Tex.card(cw, ch, accent: c.color)) { [weak self] in
+            let b = Button("", size: CGSize(width: cw, height: ch), texture: Tex.card(cw, ch, accent: c.color, glow: c.accent)) { [weak self] in
                 self?.closeOverlay()
                 c.action()
             }

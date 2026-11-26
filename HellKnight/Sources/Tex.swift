@@ -333,9 +333,10 @@ enum Tex {
     }
 
     /// Boon card: dark glass card with a glowing colored header.
-    static func card(_ w: CGFloat, _ h: CGFloat, accent: UIColor) -> SKTexture {
+    static func card(_ w: CGFloat, _ h: CGFloat, accent: UIColor, glow: UIColor? = nil) -> SKTexture {
         let W = w.rounded(), H = h.rounded()
-        return make("card2_\(Int(W))x\(Int(H))_\(colorKey(accent))", W + 10, H + 10) { c in
+        let gl = glow ?? accent
+        return make("card3_\(Int(W))x\(Int(H))_\(colorKey(accent))_\(colorKey(gl))", W + 10, H + 10) { c in
             let shape = Rr(5, 5, W, H, 14)
             c.saveGState()
             c.setShadow(offset: CGSize(width: 0, height: 4), blur: 6, color: UIColor(white: 0, alpha: 0.7).cgColor)
@@ -345,7 +346,7 @@ enum Tex {
             c.saveGState()
             c.addPath(shape)
             c.clip()
-            radial(c, W / 2 + 5, 40, W * 0.85, [accent.withAlphaComponent(0.42), accent.withAlphaComponent(0)], [0, 1])
+            radial(c, W / 2 + 5, 40, W * 0.85, [gl.withAlphaComponent(0.38), gl.withAlphaComponent(0)], [0, 1])
             rect(c, 5, 5, W, 3, accent)
             c.restoreGState()
             stroke(c, Rr(5.5, 5.5, W - 1, H - 1, 14), accent.withAlphaComponent(0.55), 1.2)
@@ -373,6 +374,14 @@ enum Tex {
             fill(c, p, UIColor(white: 0, alpha: 0.65))
             c.restoreGState()
             stroke(c, p, UIColor(white: 1, alpha: 0.16), 1)
+        }
+    }
+
+    /// Vertical darkening behind the top HUD row.
+    static func scrim() -> SKTexture {
+        make("scrim", 8, 64) { c in
+            linear(c, Rr(0, 0, 8, 64), UIColor(white: 0, alpha: 0.7), UIColor(white: 0, alpha: 0),
+                   from: CGPoint(x: 0, y: 0), to: CGPoint(x: 0, y: 64))
         }
     }
 

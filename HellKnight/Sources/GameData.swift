@@ -149,7 +149,7 @@ struct Boon {
 // MARK: - Rewards
 
 enum Reward: Equatable {
-    case boon(Patron), heart, gold, souls, anvil, heal, shop, boss
+    case boon(Patron), heart, gold, souls, anvil, heal, shop, boss, elite, rest, altar, relic
 
     var title: String {
         switch self {
@@ -161,6 +161,10 @@ enum Reward: Equatable {
         case .heal: return "Blood Draught"
         case .shop: return "Ash Merchant"
         case .boss: return "Guardian's Lair"
+        case .elite: return "Elite Chamber"
+        case .rest: return "Rest Shrine"
+        case .altar: return "Cursed Altar"
+        case .relic: return "Relic"
         }
     }
 
@@ -174,6 +178,10 @@ enum Reward: Equatable {
         case .heal: return UIColor(hex: 0xff4060)
         case .shop: return UIColor(hex: 0xf0c040)
         case .boss: return UIColor(hex: 0xff2020)
+        case .elite: return UIColor(hex: 0xffc040)
+        case .rest: return UIColor(hex: 0x7ad8ff)
+        case .altar: return UIColor(hex: 0xc070ff)
+        case .relic: return UIColor(hex: 0xffd070)
         }
     }
 }
@@ -344,7 +352,37 @@ final class Meta {
 
 // MARK: - Run state
 
-enum RoomType { case combat, shop, boss }
+enum RoomType { case combat, shop, boss, rest, altar }
+
+// MARK: - Relics (run-long passive items, mostly from Elite chambers)
+
+enum Relic: Int, CaseIterable {
+    case phoenix, bloodstone, hourglass, ironSkull, crown, purse, die, lantern, moss
+
+    var name: String {
+        ["Phoenix Feather", "Bloodstone", "Cracked Hourglass", "Iron Skull", "Shattered Crown",
+         "Miser's Purse", "Gambler's Die", "Wraith Lantern", "Grave Moss"][rawValue]
+    }
+
+    var desc: String {
+        switch self {
+        case .phoenix: return "Once per run, rise again with 40% health when you would die."
+        case .bloodstone: return "Every foe you slay restores 2 health."
+        case .hourglass: return "Your Special recharges 30% faster."
+        case .ironSkull: return "+30 max health."
+        case .crown: return "Deal +25% damage while above 80% health."
+        case .purse: return "Gain 50% more gold from every source."
+        case .die: return "Patrons offer you 4 boons to choose from instead of 3."
+        case .lantern: return "+1 cast charge, and your casts pierce through a foe."
+        case .moss: return "Restore 12% of your max health when entering a chamber."
+        }
+    }
+
+    var color: UIColor {
+        let c: [UInt32] = [0xff7a2a, 0xe0203a, 0x7ad8ff, 0xd8d0c0, 0xffc040, 0xf0c040, 0xc070ff, 0x80ffd0, 0x8adf6a]
+        return UIColor(hex: c[rawValue])
+    }
+}
 
 final class RunState {
     static let finalDepth = 2
@@ -369,6 +407,11 @@ final class RunState {
     var nextReward: Reward
     var kills = 0
     var anvilTaken: Set<String> = []
+    var relics: [Relic] = []
+    var phoenixUsed = false
+    var damageTakenMult: CGFloat = 1
+    var enemyHpMult: CGFloat = 1
+    var lastSpecial: Reward?
 
     init(weapon: WeaponKind) {
         let meta = Meta.shared
@@ -388,8 +431,32 @@ final class RunState {
     var roomType: RoomType {
         if room >= 6 { return .boss }
         if room == 3 { return .shop }
-        return .combat
+        switch nextReward {
+        case .rest: return .rest
+        case .altar: return .altar
+        default: return .combat
+        }
     }
+
+    var isEliteRoom: Bool { roomType == .combat && nextReward == .elite }
+
+    func hasRelic(_ r: Relic) -> Bool { relics.contains(r) }
+
+    func addRelic(_ r: Relic) {
+        guard !relics.contains(r) else { return }
+        relics.append(r)
+        switch r {
+        case .ironSkull:
+            maxHp += 30
+            hp += 30
+        case .lantern:
+            maxCast += 1
+        default:
+            break
+        }
+    }
+
+    func goldGain(_ g: Int) -> Int { hasRelic(.purse) ? Int((CGFloat(g) * 1.5).rounded()) : g }
 
     func pm(_ p: Passive) -> CGFloat { passives[p]?.mult ?? 0 }
     func has(_ p: Passive) -> Bool { passives[p] != nil }
@@ -416,6 +483,45 @@ struct AnvilOption {
         AnvilOption(id: "flask", title: "Ember Flask", desc: "+1 cast charge.", once: true) { $0.maxCast += 1 },
         AnvilOption(id: "wing", title: "Wingstep", desc: "+1 dash charge.", once: true) { $0.maxDash += 1 },
         AnvilOption(id: "mend", title: "Searing Mend", desc: "Fully restore your health.", once: false) { $0.hp = $0.maxHp },
+    ]
+}
+
+// MARK: - Cursed altar bargains
+
+struct Bargain {
+    let title: String
+    let cost: String
+    let gain: String
+    let available: (RunState) -> Bool
+    let apply: (RunState) -> Void
+
+    static let all: [Bargain] = [
+        Bargain(title: "Blood Price", cost: "Lose 25% of your max health.", gain: "Gain a Legendary boon.",
+                available: { $0.maxHp > 60 }, apply: { r in
+                    r.maxHp = (r.maxHp * 0.75).rounded()
+                    r.hp = min(r.hp, r.maxHp)
+                }),
+        Bargain(title: "Gilded Chains", cost: "Take 20% more damage for the rest of the run.", gain: "Gain 200 gold.",
+                available: { _ in true }, apply: { r in
+                    r.damageTakenMult *= 1.2
+                    r.gold += r.goldGain(200)
+                }),
+        Bargain(title: "Soul Tithe", cost: "Pay 60 gold.", gain: "Gain 45 Soul Shards.",
+                available: { $0.gold >= 60 }, apply: { r in
+                    r.gold -= 60
+                    r.souls += 45
+                }),
+        Bargain(title: "Hunger of the Pit", cost: "Lose 15 max health.", gain: "+20% damage with everything.",
+                available: { $0.maxHp > 40 }, apply: { r in
+                    r.maxHp -= 15
+                    r.hp = min(r.hp, r.maxHp)
+                    r.damageMult *= 1.2
+                }),
+        Bargain(title: "Pact of Ruin", cost: "Foes have 25% more health for the rest of the run.", gain: "Gain a random Relic.",
+                available: { $0.relics.count < Relic.allCases.count }, apply: { r in
+                    r.enemyHpMult *= 1.25
+                    if let rel = Relic.allCases.filter({ !r.relics.contains($0) }).randomElement() { r.addRelic(rel) }
+                }),
     ]
 }
 

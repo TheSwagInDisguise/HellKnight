@@ -128,7 +128,7 @@ extension GameScene {
     func doSpecial() {
         guard let p = player else { return }
         let w = runData.weapon
-        p.specialCD = w.specialCooldown
+        p.specialCD = w.specialCooldown * (runData.hasRelic(.hourglass) ? 0.7 : 1)
         p.attackTimer = 0.32 / runData.attackSpeed
         let col = slotColor(.special)
         sfx(.special)
@@ -189,7 +189,7 @@ extension GameScene {
         let col = runData.slots[.cast]?.patron.color ?? UIColor(hex: 0xff3a2a)
         spawnProjectile(at: p.position + CGPoint(angle: a, length: 22), vel: CGPoint(angle: a, length: 820),
                         damage: 32, hostile: false, texture: Tex.orb(), size: CGSize(width: 30, height: 30),
-                        radius: 14, color: col, life: 1.1, pierce: 0, slot: .cast, knock: 80)
+                        radius: 14, color: col, life: 1.1, pierce: runData.hasRelic(.lantern) ? 1 : 0, slot: .cast, knock: 80)
         sfx(.cast)
     }
 
@@ -244,6 +244,7 @@ extension GameScene {
             hits += 1
             hitEnemy(e, base: damage, slot: slot, dir: d.normalized, knock: knock, leech: &leeched)
         }
+        hitBreakables(origin: origin, range: range, angle: angle, arc: arc)
         for pr in projectiles where pr.hostile && !pr.dead {
             let d = pr.position - origin
             if d.length < range + 8 && (full || abs(angleDiff(d.angle, angle)) < arc / 2 + 0.25) {
@@ -282,6 +283,7 @@ extension GameScene {
             }
         }
         if crit { dmg *= 3 + runData.pm(.assassin) }
+        if runData.hasRelic(.crown) && runData.hp >= runData.maxHp * 0.8 { dmg *= 1.25 }
         e.knockVel = e.knockVel + dir * (knock * 6 * e.knockResist)
         dealDamage(e, dmg, crit: crit, color: crit ? Patron.umbral.color : .white)
     }
@@ -330,6 +332,7 @@ extension GameScene {
                 pickups.append(c)
             }
             if runData.has(.bloodPact) { healPlayer(2 * runData.pm(.bloodPact), quiet: true) }
+            if runData.hasRelic(.bloodstone) { healPlayer(2, quiet: true) }
             if runData.has(.immolation) && e.burnTime > 0 {
                 explosion(at: e.position, radius: 90, damage: 20 * runData.pm(.immolation), hostile: false, color: Patron.pyre.color)
             }
@@ -375,6 +378,7 @@ extension GameScene {
             for e in enemies where e.alive && e.position.distance(to: p) < radius + e.radius {
                 dealDamage(e, damage * runData.damageMult, color: color)
             }
+            hitBreakables(origin: p, range: radius, angle: 0, arc: .pi * 2)
         }
     }
 
@@ -398,7 +402,7 @@ extension GameScene {
             p.invuln = 0.3
             return
         }
-        var dmg = amount
+        var dmg = amount * runData.damageTakenMult
         if runData.has(.glacialArmor) { dmg *= max(0.5, 1 - 0.1 * runData.pm(.glacialArmor)) }
         runData.hp -= dmg
         p.invuln = 0.75
@@ -417,7 +421,14 @@ extension GameScene {
             p.lungeTime = 0.1
         }
         if runData.hp <= 0 {
-            if runData.revives > 0 {
+            if runData.hasRelic(.phoenix) && !runData.phoenixUsed {
+                runData.phoenixUsed = true
+                runData.hp = runData.maxHp * 0.4
+                p.invuln = 2.0
+                hud.banner("Phoenix Feather", "Rise from the ashes", color: Relic.phoenix.color)
+                explosion(at: p.position, radius: 180, damage: 60, hostile: false, color: Relic.phoenix.color)
+                for pr in projectiles where pr.hostile { pr.dead = true }
+            } else if runData.revives > 0 {
                 runData.revives -= 1
                 runData.hp = runData.maxHp * 0.5
                 p.invuln = 2.0
@@ -498,7 +509,7 @@ extension GameScene {
                 pr.dead = true
                 continue
             }
-            if room.blocked(pr.position, pr.radius * 0.4) {
+            if room.shotBlocked(pr.position) {
                 pr.dead = true
                 burst(at: pr.position, color: pr.tint, count: 4, speed: 90, size: 5, life: 0.25)
                 continue
@@ -509,6 +520,9 @@ extension GameScene {
                     hurtPlayer(pr.damage, from: pr.position)
                 }
             } else {
+                for u in breakables where !u.broken && pr.position.distance(to: u.position) < pr.radius + u.radius {
+                    breakUrn(u)
+                }
                 for e in enemies where e.alive && !pr.hitSet.contains(ObjectIdentifier(e)) {
                     if pr.position.distance(to: e.position) < pr.radius + e.radius {
                         pr.hitSet.insert(ObjectIdentifier(e))
@@ -544,7 +558,7 @@ extension GameScene {
                 if d < 170 { pk.position = pk.position + (p.position - pk.position).normalized * (520 * dt) }
                 if d < 24 {
                     pk.taken = true
-                    runData.gold += pk.coinValue
+                    runData.gold += runData.goldGain(pk.coinValue)
                     sfx(.pickup, 0.35)
                     pk.removeFromParent()
                 }

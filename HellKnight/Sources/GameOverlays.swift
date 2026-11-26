@@ -20,7 +20,7 @@ extension GameScene {
             floatText("+25 Max Health", at: at, color: UIColor(hex: 0xff5060), size: 18)
             completion()
         case .gold:
-            let g = Int(rnd(55, 85)) + 25 * runData.depth
+            let g = runData.goldGain(Int(rnd(55, 85)) + 25 * runData.depth)
             runData.gold += g
             floatText("+\(g) Gold", at: at, color: Ink.gold, size: 18)
             completion()
@@ -32,7 +32,18 @@ extension GameScene {
         case .heal:
             healPlayer(runData.maxHp * 0.35)
             completion()
-        case .shop, .boss:
+        case .relic:
+            sfx(.boon)
+            showRelicChoice(completion: completion)
+        case .rest:
+            healPlayer(runData.maxHp * 0.4)
+            floatText("Restored", at: at, height: 110, color: Reward.rest.color, size: 18)
+            sfx(.boon)
+            completion()
+        case .altar:
+            sfx(.boon)
+            showAltarChoice(completion: completion)
+        case .shop, .boss, .elite:
             completion()
         }
     }
@@ -44,7 +55,7 @@ extension GameScene {
         }
         kinds.shuffle()
         var cards: [ChoiceCard] = []
-        for k in kinds.prefix(3) {
+        for k in kinds.prefix(runData.hasRelic(.die) ? 4 : 3) {
             var boon = Boon(kind: k, rarity: Rarity.roll(luck: runData.luck))
             var sub = boon.slotName
             switch k {
@@ -107,6 +118,63 @@ extension GameScene {
             })
         }
         showChoices(title: "Hellforge Anvil", subtitle: "Temper your \(runData.weapon.name)", accent: UIColor(hex: 0xffa040), cards: cards)
+    }
+
+    func showRelicChoice(completion: @escaping () -> Void) {
+        let options = Relic.allCases.filter { !runData.hasRelic($0) }.shuffled().prefix(3)
+        if options.isEmpty {
+            runData.souls += 30
+            completion()
+            return
+        }
+        var cards: [ChoiceCard] = []
+        for rel in options {
+            cards.append(ChoiceCard(tag: "RELIC", title: rel.name, sub: "Lasts for the whole run", desc: rel.desc,
+                                    color: Reward.relic.color, accent: rel.color, icon: .relic) { [weak self] in
+                guard let self = self else { return }
+                self.runData.addRelic(rel)
+                if let p = self.player {
+                    self.burst(at: p.position, color: rel.color, count: 26, speed: 240)
+                    self.shockwave(at: p.position, radius: 100, color: rel.color)
+                }
+                self.hud.banner(rel.name, "Relic claimed", color: rel.color, small: true)
+                completion()
+            })
+        }
+        showChoices(title: "Choose a Relic", subtitle: "Spoils of the elite chamber.", accent: Reward.relic.color, cards: cards)
+    }
+
+    func showAltarChoice(completion: @escaping () -> Void) {
+        let offers = Bargain.all.filter { $0.available(runData) }.shuffled().prefix(2)
+        var cards: [ChoiceCard] = []
+        for b in offers {
+            cards.append(ChoiceCard(tag: "BARGAIN", title: b.title, sub: b.gain, desc: "Price: " + b.cost,
+                                    color: Reward.altar.color, accent: Reward.altar.color, icon: .altar) { [weak self] in
+                guard let self = self else { return }
+                b.apply(self.runData)
+                if b.title == "Blood Price" {
+                    let pat = Patron.allCases.randomElement() ?? .pyre
+                    var kinds: [Boon.Kind] = Slot.allCases.map { Boon.Kind.slot($0, pat) }
+                    for pa in Passive.allCases where pa.patron == pat { kinds.append(.passive(pa)) }
+                    if let k = kinds.randomElement() {
+                        let boon = Boon(kind: k, rarity: .legendary)
+                        self.applyBoon(boon)
+                        self.hud.banner(boon.title, "Legendary boon of \(pat.short)", color: Rarity.legendary.color, small: true)
+                    }
+                }
+                if let p = self.player {
+                    self.splat(at: p.position, size: 90, color: Ink.blood, alpha: 0.8, fade: 8)
+                    self.burst(at: p.position, color: Reward.altar.color, count: 24, speed: 220)
+                }
+                sfx(.roar, 0.5)
+                completion()
+            })
+        }
+        cards.append(ChoiceCard(tag: "REFUSE", title: "Walk Away", sub: "Keep what you have", desc: "Leave the altar untouched. Nothing is lost, nothing is gained.",
+                                color: Ink.boneDark, accent: Ink.boneDark, icon: nil) {
+            completion()
+        })
+        showChoices(title: "Cursed Altar", subtitle: "A voice offers power, at a price.", accent: Reward.altar.color, cards: cards)
     }
 
     // MARK: - Generic overlays
@@ -243,7 +311,8 @@ extension GameScene {
         for pa in Passive.allCases {
             if let r = runData.passives[pa] { lines.append("\(pa.name) (\(r.name), \(pa.patron.short))") }
         }
-        if runData.slots.isEmpty && runData.passives.isEmpty { lines.append("No boons yet. Clear chambers to earn them.") }
+        for rel in runData.relics { lines.append("Relic: \(rel.name)") }
+        if runData.slots.isEmpty && runData.passives.isEmpty && runData.relics.isEmpty { lines.append("No boons yet. Clear chambers to earn them.") }
         let list = makeLabel(lines.joined(separator: "\n"), size: 14, color: Ink.bone, font: Font.medium)
         list.numberOfLines = 0
         list.preferredMaxLayoutWidth = pw - 40

@@ -35,6 +35,13 @@ enum ShotMode {
             case "boss":
                 run.depth = 0
                 run.room = 6
+            case "rest":
+                run.room = 2
+                run.nextReward = .rest
+            case "altar":
+                run.depth = 1
+                run.room = 2
+                run.nextReward = .altar
             default:
                 run.depth = 0
                 run.room = 1

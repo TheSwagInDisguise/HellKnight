@@ -16,7 +16,19 @@ The game is drawn in a dark gothic ink-engraving style: bone-white and black lin
   - Ombrae: Crits
 
   Boons come in four rarities: Common, Rare, Epic and Legendary.
-- **Rooms.** You pick your next chamber by the reward shown on its door: boon, gold, Infernal Heart, Soul Shards, or the Hellforge Anvil (weapon upgrades). Each depth also has an Ash Merchant shop.
+- **Hand-designed arenas.** Room layouts include crosses, L-shaped halls, chasm bridges, block mazes and courtyards, and are randomly mirrored. Arenas are filled with:
+  - stone blocks and pillars to fight around
+  - chasms you can knock enemies into
+  - burning pools that hurt anyone standing in them
+  - timed spike traps
+  - breakable urns full of gold
+- **Branching path.** You choose your next chamber by the reward shown on its door. There are 2 or 3 doors to pick from:
+  - boon, gold, Infernal Heart, Soul Shards, or the Hellforge Anvil
+  - **Elite Chambers:** a harder fight that rewards a **Relic**
+  - **Rest Shrines:** a fountain that heals you
+  - **Cursed Altars:** a power-for-a-price bargain
+  - an Ash Merchant shop on every depth
+- **Relics:** run-long items such as Phoenix Feather (extra life), Gambler's Die (4 boon choices), Bloodstone (heal on kill) and more.
 - **3 depths, each ending in a guardian boss.** Every boss has several attack patterns and an enraged second phase:
   - Cinder Halls
   - Ossuary Wastes
@@ -38,6 +50,8 @@ The game is drawn in a dark gothic ink-engraving style: bone-white and black lin
 Attacks and casts auto-aim at nearby enemies in the direction you're holding. With the joystick released, they aim at the nearest enemy.
 
 ## Getting the IPA
+
+Every push also runs the game in the iOS Simulator and saves screenshots as a workflow artifact (Actions → the run → Artifacts → `screenshots`).
 
 Every push triggers the **Build IPA** GitHub Action, which runs on a macOS runner. It:
 

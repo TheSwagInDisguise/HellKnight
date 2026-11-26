@@ -495,6 +495,7 @@ final class HUD: SKNode {
         var sig = ""
         for s in Slot.allCases { if let b = run.slots[s] { sig += "\(s.rawValue)\(b.patron.rawValue)\(b.rarity.rawValue)," } }
         for p in Passive.allCases { if let r = run.passives[p] { sig += "p\(p.rawValue)\(r.rawValue)," } }
+        for rel in run.relics { sig += "r\(rel.rawValue)," }
         if sig != boonSig {
             boonSig = sig
             boonRow.removeAllChildren()
@@ -515,6 +516,14 @@ final class HUD: SKNode {
                 ic.alpha = 0.85
                 boonRow.addChild(ic)
                 x += 22
+            }
+            for rel in run.relics {
+                let ic = SKSpriteNode(texture: Tex.icon(.relic), size: CGSize(width: 22, height: 22))
+                ic.color = rel.color
+                ic.colorBlendFactor = 0.3
+                ic.position = CGPoint(x: x + 2, y: 0)
+                boonRow.addChild(ic)
+                x += 24
             }
         }
     }

@@ -37,6 +37,11 @@ final class GameScene: BaseScene {
     var camBaseScale: CGFloat = 1
     var zoomPunch: CGFloat = 0
     var shot: String?
+    var breakables: [Breakable] = []
+    var spikes: [SpikeTrap] = []
+    var spikeClock: CGFloat = 0
+    var hazardTick: CGFloat = 0
+    var flowTimer: CGFloat = 0
     var shotTimer: CGFloat = 0
 
     init(size: CGSize, runData: RunState) {
@@ -123,6 +128,7 @@ final class GameScene: BaseScene {
         }
         if shot != nil { updateShot(dt) }
         updatePlayer(dt)
+        updateHazards(dt)
         for e in enemies {
             if state != .playing { break }
             e.update(dt, game: self)

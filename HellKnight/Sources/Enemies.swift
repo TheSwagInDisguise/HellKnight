@@ -131,6 +131,10 @@ class Enemy: SKNode {
         if knockVel.length > 1 {
             position = position + knockVel * dt
             knockVel = knockVel * max(0, 1 - 9 * dt)
+            if knockVel.length > 60 && !(self is Boss) && !(self is Wisp) && game.room.cellAt(position) == .pit {
+                game.enemyFell(self)
+                return
+            }
         }
         if stun > 0 {
             stun -= dt
@@ -221,7 +225,7 @@ final class Imp: Enemy {
         timer -= dt
         switch s {
         case .chase:
-            moveToward(p, dt)
+            moveToward(game.steer(self, p), dt)
             if position.distance(to: p) < 120 && timer <= 0 {
                 s = .windup
                 timer = 0.42
@@ -247,7 +251,7 @@ final class Imp: Enemy {
                 timer = 0.6
             }
         case .recover:
-            moveToward(p, dt, speedMult: 0.25)
+            moveToward(game.steer(self, p), dt, speedMult: 0.25)
             if timer <= 0 {
                 s = .chase
                 timer = rnd(0.4, 0.9)
@@ -296,8 +300,11 @@ final class Archer: Enemy {
             }
             return
         }
+        let sees = game.room.lineOfSight(position, p)
         var mv = CGPoint.zero
-        if dist < 230 {
+        if !sees {
+            mv = (game.steer(self, p) - position).normalized
+        } else if dist < 230 {
             mv = d.normalized * -1
         } else if dist > 420 {
             mv = d.normalized
@@ -306,7 +313,7 @@ final class Archer: Enemy {
             if chance(dt * 0.4) { strafe *= -1 }
         }
         position = position + mv * (moveSpeed * dt)
-        if timer <= 0 && dist < 700 {
+        if timer <= 0 && dist < 700 && sees {
             aiming = true
             timer = 0.75
             aimAngle = d.angle
@@ -338,7 +345,7 @@ final class Brute: Enemy {
         timer -= dt
         switch s {
         case .chase:
-            moveToward(p, dt)
+            moveToward(game.steer(self, p), dt)
             if position.distance(to: p) < 400 && timer <= 0 {
                 s = .windup
                 timer = 0.8
@@ -454,10 +461,12 @@ final class Priest: Enemy {
             return
         }
         let dist = d.length
-        if dist < 260 {
+        if !game.room.lineOfSight(position, p) {
+            moveToward(game.steer(self, p), dt)
+        } else if dist < 260 {
             position = position - d.normalized * (moveSpeed * dt)
         } else if dist > 420 {
-            moveToward(p, dt)
+            moveToward(game.steer(self, p), dt)
         }
         if timer <= 0 {
             casting = true
@@ -482,7 +491,7 @@ final class Priest: Enemy {
 // MARK: - Boss
 
 final class Boss: Enemy {
-    enum Pattern { case spiral, charge, rings, slam, summon }
+    enum Pattern { case spiral, charge, rings, slam, summon, leap }
     enum ChargeStep { case wind, go, rest }
 
     static let names = ["Gorrath, the Cinder Warden", "Vexis, Matron of Bones", "Malphor, the Abyssal King"]
@@ -500,6 +509,9 @@ final class Boss: Enemy {
     var hitDone = false
     var phase2 = false
     var contactCD: CGFloat = 0
+    var leapFrom = CGPoint.zero
+    var leapTo = CGPoint.zero
+    var farTime: CGFloat = 0
     let rage = SKSpriteNode(texture: Tex.glow(), size: CGSize(width: 260, height: 300))
 
     init(depth: Int) {
@@ -529,7 +541,7 @@ final class Boss: Enemy {
         let d = p - position
         face(d)
         contactCD -= dt
-        if contactCD <= 0 && d.length < radius + game.player.radius - 6 {
+        if contactCD <= 0 && pattern != .leap && d.length < radius + game.player.radius - 6 {
             contactCD = 0.8
             game.hurtPlayer(12 * dmgMult, from: position)
         }
@@ -540,9 +552,10 @@ final class Boss: Enemy {
             game.addShake(10)
             rage.run(.repeatForever(.sequence([.fadeAlpha(to: 0.5, duration: 0.5), .fadeAlpha(to: 0.25, duration: 0.5)])))
         }
+        if game.room.lineOfSight(position, p) { farTime = max(0, farTime - dt) } else { farTime += dt }
         guard let pat = pattern else {
             idle -= dt
-            if d.length > 150 { moveToward(p, dt, speedMult: phase2 ? 1.25 : 0.9) }
+            if d.length > 150 { moveToward(game.steer(self, p), dt, speedMult: phase2 ? 1.25 : 0.9) }
             if idle <= 0 { begin(game) }
             return
         }
@@ -609,10 +622,40 @@ final class Boss: Enemy {
         case .slam, .summon:
             timer -= dt
             if timer <= 0 { end() }
+        case .leap:
+            timer -= dt
+            let t = clamp(1 - timer / 1.0, 0, 1)
+            let e = t * t * (3 - 2 * t)
+            position = leapFrom + (leapTo - leapFrom) * e
+            sprite.position = CGPoint(x: 0, y: sin(t * .pi) * 190)
+            shadowNode.setScale(1 - sin(t * .pi) * 0.5)
+            if timer <= 0 {
+                sprite.position = .zero
+                shadowNode.setScale(1)
+                game.explosion(at: position, radius: 140, damage: 22 * dmgMult, hostile: true, color: color)
+                game.punch(0.05)
+                for i in 0..<12 {
+                    game.enemyOrb(from: position, angle: CGFloat(i) * .pi / 6, speed: 220, damage: 8 * dmgMult, color: color)
+                }
+                end()
+            }
         }
     }
 
     func begin(_ game: GameScene) {
+        let p = game.player.position
+        // Hiding or kiting far away invites a leap onto your head.
+        if (farTime > 1.2 || position.distance(to: p) > 430) && last != .leap {
+            farTime = 0
+            pattern = .leap
+            last = .leap
+            leapFrom = position
+            leapTo = game.room.resolve(p, radius)
+            timer = 1.0
+            game.telegraphCircle(at: leapTo, radius: 140, duration: 1.0)
+            sfx(.roar, 0.6)
+            return
+        }
         var options: [Pattern] = [.spiral, .charge, .rings, .slam]
         if (phase2 || depth > 0) && game.enemies.count < 5 { options.append(.summon) }
         options.removeAll { $0 == last }
@@ -640,6 +683,8 @@ final class Boss: Enemy {
                 game.delayedExplosion(at: at, radius: 85, delay: 1.0 + 0.12 * CGFloat(i), damage: 18 * dmgMult, color: color)
             }
             timer = 1.9
+        case .leap:
+            break
         case .summon:
             let n = 2 + depth
             for _ in 0..<n {

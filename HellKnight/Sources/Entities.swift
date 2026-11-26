@@ -1,63 +1,6 @@
 import SpriteKit
 import UIKit
 
-// MARK: - Room geometry
-
-struct Pillar {
-    let pos: CGPoint
-    let r: CGFloat
-}
-
-final class Room {
-    let bounds: CGRect
-    let type: RoomType
-    var pillars: [Pillar] = []
-
-    init(bounds: CGRect, type: RoomType) {
-        self.bounds = bounds
-        self.type = type
-    }
-
-    /// Pushes a circle out of pillars and keeps it inside the room.
-    func resolve(_ p: CGPoint, _ r: CGFloat) -> CGPoint {
-        var q = p
-        for pl in pillars {
-            let d = q - pl.pos
-            let md = pl.r + r
-            let l = d.length
-            if l < md {
-                let n = l > 0.001 ? d * (1 / l) : CGPoint(x: 0, y: 1)
-                q = pl.pos + n * md
-            }
-        }
-        q.x = clamp(q.x, bounds.minX + r, bounds.maxX - r)
-        q.y = clamp(q.y, bounds.minY + r, bounds.maxY - r)
-        return q
-    }
-
-    func blocked(_ p: CGPoint, _ r: CGFloat) -> Bool {
-        if !bounds.insetBy(dx: r, dy: r).contains(p) { return true }
-        return pillars.contains { $0.pos.distance(to: p) < $0.r + r }
-    }
-
-    func randomOpenPoint(margin: CGFloat, avoid: CGPoint, minDist: CGFloat) -> CGPoint {
-        var best = CGPoint(x: bounds.midX, y: bounds.midY)
-        var bestD: CGFloat = -1
-        for _ in 0..<40 {
-            let p = CGPoint(x: rnd(bounds.minX + margin, bounds.maxX - margin),
-                            y: rnd(bounds.minY + margin, bounds.maxY - margin))
-            if blocked(p, margin) { continue }
-            let d = p.distance(to: avoid)
-            if d >= minDist { return p }
-            if d > bestD {
-                bestD = d
-                best = p
-            }
-        }
-        return best
-    }
-}
-
 // MARK: - Player
 
 final class Player: SKNode {
@@ -253,12 +196,13 @@ final class Pickup: SKNode {
 
     var isCoin: Bool { reward == nil }
 
-    init(reward: Reward?, coinValue: Int = 0, price: Int = 0, depth: Int = 0) {
+    init(reward: Reward?, coinValue: Int = 0, price: Int = 0, depth: Int = 0, invisible: Bool = false) {
         self.reward = reward
         self.coinValue = coinValue
         self.price = price
-        radius = reward == nil ? 10 : 28
+        radius = invisible ? 46 : (reward == nil ? 10 : 28)
         super.init()
+        if invisible { return }
         let up = Billboard()
         if let r = reward {
             let sig = SKSpriteNode(texture: Tex.sigil(), size: CGSize(width: 110, height: 110))

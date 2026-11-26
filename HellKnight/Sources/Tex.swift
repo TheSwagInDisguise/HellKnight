@@ -854,18 +854,19 @@ enum Tex {
         rect(c, 0, H - 12, w, 12, pal.stoneDark)
         line(c, [CGPoint(x: 0, y: H - 12), CGPoint(x: w, y: H - 12)], Ink.black, 2)
         if v == 1 {
-            let arch = gothicArch(w / 2 - 15, H - 30, 30, 78)
+            let aw = min(30, w * 0.55)
+            let arch = gothicArch(w / 2 - aw / 2, H - 30, aw, 78)
             fill(c, arch, Ink.black)
             c.saveGState()
             c.addPath(arch)
             c.clip()
             radial(c, w / 2, H - 50, 46, [pal.accent.withAlphaComponent(0.9), pal.accent.withAlphaComponent(0)], [0, 1])
-            for i in 0..<3 { rect(c, w / 2 - 9 + CGFloat(i) * 8, H - 110, 2.5, 80, Ink.black) }
+            for i in 0..<3 { rect(c, w / 2 - aw * 0.3 + CGFloat(i) * aw * 0.27, H - 110, 2.5, 80, Ink.black) }
             c.restoreGState()
             stroke(c, arch, Ink.black, 3)
             stroke(c, arch, pal.line.withAlphaComponent(0.5), 1)
         } else if v == 3 {
-            let bw: CGFloat = 36
+            let bw: CGFloat = min(36, w * 0.72)
             let bx = w / 2 - bw / 2
             let cloth = P([(bx, 24), (bx + bw, 24), (bx + bw, H - 46), (bx + bw / 2, H - 60), (bx, H - 46)])
             c.saveGState()
@@ -879,10 +880,11 @@ enum Tex {
             }
             stroke(c, cloth, Ink.black, 1.6)
             stroke(c, P([(bx + 3, 27), (bx + bw - 3, 27), (bx + bw - 3, H - 48), (bx + bw / 2, H - 61), (bx + 3, H - 48)]), Ink.gold.withAlphaComponent(0.7), 1)
-            let em = E(w / 2, 62, 9, 10)
+            let es = bw / 36
+            let em = E(w / 2, 62, 9 * es, 10 * es)
             ink(c, em, Ink.bone, lw: 1.4)
-            fill(c, E(w / 2 - 3.2, 62, 2, 2.4), Ink.black)
-            fill(c, E(w / 2 + 3.2, 62, 2, 2.4), Ink.black)
+            fill(c, E(w / 2 - 3.2 * es, 62, 2 * es, 2.4 * es), Ink.black)
+            fill(c, E(w / 2 + 3.2 * es, 62, 2 * es, 2.4 * es), Ink.black)
             ink(c, Rr(bx - 4, 20, bw + 8, 4, 2), Ink.gold, lw: 1)
         } else if v == 2 {
             let niche = gothicArch(w / 2 - 12, H - 40, 24, 46)
@@ -893,20 +895,21 @@ enum Tex {
             fill(c, E(w / 2 - 2.2, H - 52, 1.5, 1.8), Ink.black)
             fill(c, E(w / 2 + 2.2, H - 52, 1.5, 1.8), Ink.black)
             for k in 0..<2 {
-                let x = w / 2 - 22 + CGFloat(k) * 44
+                let x = w / 2 - w * 0.24 + CGFloat(k) * w * 0.48
                 line(c, [CGPoint(x: x, y: 16), CGPoint(x: x + 3, y: 50), CGPoint(x: x, y: 80)], Ink.boneDark.withAlphaComponent(0.7), 1.5)
             }
         }
     }
 
     /// Wall segment. side 0 = back-left wall (rises to the right), side 1 = back-right wall (falls to the right).
-    static func wallSeg(_ depth: Int, side: Int, _ v: Int) -> SKTexture {
+    static func wallSeg(_ depth: Int, side: Int, _ v: Int, len: CGFloat = 128) -> SKTexture {
         let pal = Palette.of(depth)
-        let w = segW + 1
-        return make("wall\(depth)_\(side)_\(v)", w, wallH + segRise) { c in
+        let w = len * isoK + 1
+        let rise = len * isoK * 0.5
+        return make("wall\(depth)_\(side)_\(v)_\(Int(len))", w, wallH + rise) { c in
             c.saveGState()
             if side == 0 {
-                c.concatenate(CGAffineTransform(a: 1, b: -0.5, c: 0, d: 1, tx: 0, ty: segRise))
+                c.concatenate(CGAffineTransform(a: 1, b: -0.5, c: 0, d: 1, tx: 0, ty: rise))
             } else {
                 c.concatenate(CGAffineTransform(a: 1, b: 0.5, c: 0, d: 1, tx: 0, ty: 0))
             }
@@ -1001,6 +1004,177 @@ enum Tex {
             hatch(c, col, region: CGRect(x: 34, y: 14, width: 14, height: 32), spacing: 2.4)
             ink(c, E(32, 14, 22, 7), pal.stone.scaled(1.2))
             ring(c, 32, 14, 14, pal.accent.withAlphaComponent(0.5), 1)
+        }
+    }
+
+    // MARK: - Arena features
+
+    static let blockH: CGFloat = 78
+
+    /// Isometric stone block occupying one 64×64 ground cell.
+    static func block(_ depth: Int) -> SKTexture {
+        let pal = Palette.of(depth)
+        let w = 64 * isoK * 2, dh = 64 * isoK
+        let H = blockH
+        return make("block\(depth)", w + 2, H + dh + 2) { c in
+            let top = P([(w / 2 + 1, 1), (w + 1, dh / 2 + 1), (w / 2 + 1, dh + 1), (1, dh / 2 + 1)])
+            let left = P([(1, dh / 2 + 1), (w / 2 + 1, dh + 1), (w / 2 + 1, dh + H + 1), (1, dh / 2 + H + 1)])
+            let right = P([(w / 2 + 1, dh + 1), (w + 1, dh / 2 + 1), (w + 1, dh / 2 + H + 1), (w / 2 + 1, dh + H + 1)])
+            fill(c, left, pal.stone.scaled(0.85))
+            fill(c, right, pal.stone.scaled(0.55))
+            for k in 1..<4 {
+                let y = CGFloat(k) * H / 4
+                line(c, [CGPoint(x: 1, y: dh / 2 + 1 + y), CGPoint(x: w / 2 + 1, y: dh + 1 + y)], Ink.black.withAlphaComponent(0.7), 1.2)
+                line(c, [CGPoint(x: w / 2 + 1, y: dh + 1 + y), CGPoint(x: w + 1, y: dh / 2 + 1 + y)], Ink.black.withAlphaComponent(0.7), 1.2)
+            }
+            for k in 0..<4 {
+                let y = CGFloat(k) * H / 4 + H / 8
+                let off: CGFloat = k % 2 == 0 ? 0.33 : 0.66
+                line(c, [CGPoint(x: 1 + w / 2 * off, y: dh / 2 + 1 + y + dh / 2 * off - H / 8),
+                         CGPoint(x: 1 + w / 2 * off, y: dh / 2 + 1 + y + dh / 2 * off + H / 8)], Ink.black.withAlphaComponent(0.6), 1)
+                line(c, [CGPoint(x: w / 2 + 1 + w / 2 * off, y: dh + 1 + y - dh / 2 * off - H / 8),
+                         CGPoint(x: w / 2 + 1 + w / 2 * off, y: dh + 1 + y - dh / 2 * off + H / 8)], Ink.black.withAlphaComponent(0.6), 1)
+            }
+            hatch(c, right, spacing: 3, color: Ink.black.withAlphaComponent(0.35))
+            fill(c, top, pal.stone.scaled(1.2))
+            sheen(c, top, light: 0.2, dark: 0.2)
+            stroke(c, P([(w / 2 + 1, 9), (w - 13, dh / 2 + 1), (w / 2 + 1, dh - 7), (15, dh / 2 + 1)]), pal.line.withAlphaComponent(0.25), 1)
+            for p in [top, left, right] { stroke(c, p, Ink.black, 1.8) }
+            line(c, [CGPoint(x: 1, y: dh / 2 + 1), CGPoint(x: w / 2 + 1, y: dh + 1), CGPoint(x: w + 1, y: dh / 2 + 1)], pal.line.withAlphaComponent(0.45), 1)
+        }
+    }
+
+    /// Burning pool cell (ground plane, 64×64).
+    static func lava(_ depth: Int, _ v: Int) -> SKTexture {
+        let pal = Palette.of(depth)
+        return make("lava\(depth)_\(v)", 64, 64) { c in
+            var rng = SeededRNG(seed: UInt64(depth * 13 + v + 900))
+            rect(c, 0, 0, 64, 64, pal.accent.scaled(0.45))
+            for _ in 0..<5 {
+                let x = CGFloat.random(in: 4...60, using: &rng), y = CGFloat.random(in: 4...60, using: &rng)
+                radial(c, x, y, CGFloat.random(in: 10...22, using: &rng), [UIColor(hex: 0xfff0c0, alpha: 0.9), pal.accent.withAlphaComponent(0)], [0, 1])
+            }
+            for _ in 0..<3 {
+                var p = CGPoint(x: CGFloat.random(in: 0...64, using: &rng), y: CGFloat.random(in: 0...64, using: &rng))
+                var pts = [p]
+                for _ in 0..<4 {
+                    p = CGPoint(x: p.x + CGFloat.random(in: -14...14, using: &rng), y: p.y + CGFloat.random(in: -14...14, using: &rng))
+                    pts.append(p)
+                }
+                line(c, pts, pal.accent.scaled(0.25), 3)
+            }
+        }
+    }
+
+    /// Chasm cell: deep shaft fading to darkness with a faint glow far below.
+    static func pit(_ depth: Int) -> SKTexture {
+        let pal = Palette.of(depth)
+        return make("pit\(depth)", 64, 64) { c in
+            rect(c, 0, 0, 64, 64, UIColor(hex: 0x020102))
+            radial(c, 32, 32, 40, [pal.accent.withAlphaComponent(0.16), pal.accent.withAlphaComponent(0)], [0, 1])
+        }
+    }
+
+    /// The visible far wall inside a chasm (ground strip, 64×22).
+    static func pitWall(_ depth: Int) -> SKTexture {
+        let pal = Palette.of(depth)
+        return make("pitwall\(depth)", 64, 26) { c in
+            linear(c, Rr(0, 0, 64, 26), pal.stone.scaled(0.8), UIColor(hex: 0x020102), from: CGPoint(x: 0, y: 0), to: CGPoint(x: 0, y: 26))
+            for x in stride(from: CGFloat(0), to: 64, by: 16) {
+                line(c, [CGPoint(x: x, y: 0), CGPoint(x: x, y: 10)], Ink.black, 1)
+            }
+            line(c, [CGPoint(x: 0, y: 0.5), CGPoint(x: 64, y: 0.5)], pal.line.withAlphaComponent(0.4), 1)
+        }
+    }
+
+    static func spikePlate(_ depth: Int) -> SKTexture {
+        let pal = Palette.of(depth)
+        return make("spikeplate\(depth)", 64, 64) { c in
+            rect(c, 2, 2, 60, 60, pal.stone.scaled(0.6))
+            stroke(c, Rr(3, 3, 58, 58), Ink.black, 2)
+            stroke(c, Rr(6, 6, 52, 52), pal.line.withAlphaComponent(0.2), 1)
+            for i in 0..<4 {
+                for j in 0..<4 {
+                    circle(c, 12 + CGFloat(i) * 13.3, 12 + CGFloat(j) * 13.3, 3.2, Ink.black)
+                }
+            }
+        }
+    }
+
+    /// Upright cluster of spikes (billboard).
+    static func spikesUp() -> SKTexture {
+        make("spikesup", 84, 50) { c in
+            let xs: [CGFloat] = [10, 22, 34, 46, 58, 70, 16, 40, 64]
+            for (i, x) in xs.enumerated() {
+                let base: CGFloat = i < 6 ? 46 : 38
+                let tip: CGFloat = i < 6 ? 6 : 12
+                let sp = P([(x - 4, base), (x, tip), (x + 4, base)])
+                ink(c, sp, Ink.bone, lw: 1.2)
+                line(c, [CGPoint(x: x, y: tip + 2), CGPoint(x: x, y: tip + 9)], Ink.blood, 1.4)
+            }
+        }
+    }
+
+    static func urn() -> SKTexture {
+        make("urn", 40, 50) { c in
+            let body = CGMutablePath()
+            body.move(to: CGPoint(x: 14, y: 6))
+            body.addLine(to: CGPoint(x: 26, y: 6))
+            body.addCurve(to: CGPoint(x: 28, y: 48), control1: CGPoint(x: 42, y: 18), control2: CGPoint(x: 38, y: 40))
+            body.addLine(to: CGPoint(x: 12, y: 48))
+            body.addCurve(to: CGPoint(x: 14, y: 6), control1: CGPoint(x: 2, y: 40), control2: CGPoint(x: -2, y: 18))
+            body.closeSubpath()
+            ink(c, body, UIColor(hex: 0x7a4a2c), lw: 2)
+            hatch(c, body, region: CGRect(x: 24, y: 0, width: 20, height: 50), spacing: 2.6)
+            line(c, [CGPoint(x: 8, y: 22), CGPoint(x: 32, y: 22)], Ink.gold.withAlphaComponent(0.7), 1.6)
+            line(c, [CGPoint(x: 8, y: 30), CGPoint(x: 32, y: 30)], Ink.black.withAlphaComponent(0.5), 1)
+            ink(c, Rr(12, 2, 16, 6, 2), UIColor(hex: 0x5a3420), lw: 1.4)
+        }
+    }
+
+    static func fountain(_ depth: Int) -> SKTexture {
+        let pal = Palette.of(depth)
+        return make("fountain\(depth)", 140, 130) { c in
+            let basin = P([(6, 96), (134, 96), (124, 124), (16, 124)])
+            ink(c, basin, pal.stone.scaled(1.05))
+            hatch(c, basin, region: CGRect(x: 90, y: 90, width: 50, height: 40), spacing: 2.6)
+            fill(c, E(70, 96, 64, 14), UIColor(hex: 0x5a0a10))
+            radial(c, 70, 96, 50, [UIColor(hex: 0xff5060, alpha: 0.8), UIColor(hex: 0xff5060, alpha: 0)], [0, 1])
+            stroke(c, E(70, 96, 64, 14), Ink.black, 2)
+            let col = Rr(60, 40, 20, 56)
+            ink(c, col, pal.stone)
+            hatch(c, col, region: CGRect(x: 72, y: 40, width: 10, height: 56), spacing: 2.4)
+            ink(c, E(70, 40, 26, 7), pal.stone.scaled(1.2))
+            let sk = E(70, 24, 11, 12)
+            ink(c, sk, Ink.bone, lw: 1.8)
+            fill(c, E(66, 24, 2.8, 3.2), Ink.black)
+            fill(c, E(74, 24, 2.8, 3.2), Ink.black)
+            line(c, [CGPoint(x: 66, y: 30), CGPoint(x: 62, y: 58), CGPoint(x: 58, y: 90)], UIColor(hex: 0xff3048), 2.4)
+            line(c, [CGPoint(x: 74, y: 30), CGPoint(x: 78, y: 58), CGPoint(x: 82, y: 90)], UIColor(hex: 0xff3048), 2.4)
+        }
+    }
+
+    static func altar(_ depth: Int) -> SKTexture {
+        let pal = Palette.of(depth)
+        return make("altar\(depth)", 130, 110) { c in
+            let slab = P([(10, 60), (120, 60), (114, 106), (16, 106)])
+            ink(c, slab, pal.stone.scaled(0.95))
+            hatch(c, slab, region: CGRect(x: 84, y: 58, width: 40, height: 50), spacing: 2.6)
+            ink(c, Rr(4, 50, 122, 12, 3), pal.stone.scaled(1.25))
+            for x in [CGFloat(34), 65, 96] {
+                ink(c, Rr(x - 4, 30, 8, 22, 2), Ink.bone, lw: 1.2)
+                line(c, [CGPoint(x: x, y: 30), CGPoint(x: x, y: 26)], Ink.black, 1)
+            }
+            radial(c, 65, 84, 22, [UIColor(hex: 0xc070ff), UIColor(hex: 0xc070ff, alpha: 0)], [0, 1])
+            stroke(c, P([(65, 70), (76, 84), (65, 98), (54, 84)]), UIColor(hex: 0xe8c0ff), 1.6)
+            fill(c, E(65, 84, 3, 3), .white)
+            splatDots(c, 30, 104)
+        }
+    }
+
+    private static func splatDots(_ c: CGContext, _ x: CGFloat, _ y: CGFloat) {
+        for (dx, r) in [(CGFloat(0), CGFloat(3)), (8, 2), (16, 1.5), (60, 2.5), (68, 1.6)] {
+            circle(c, x + dx, y - 2, r, Ink.blood)
         }
     }
 
@@ -1211,6 +1385,51 @@ enum Tex {
                 ink(c, P([(18, 10), (34, 10), (30, 18), (22, 18)]), UIColor(hex: 0x6a4524), lw: 1.5)
                 line(c, [CGPoint(x: 19, y: 18), CGPoint(x: 33, y: 18)], Ink.gold, 2)
                 ink(c, E(26, 33, 6, 6), Ink.gold, lw: 1.2)
+            }
+        case .elite:
+            return make("icon_elite", 52, 52) { c in
+                radial(c, 26, 26, 26, [UIColor(hex: 0xffc040, alpha: 0.5), UIColor(hex: 0xffc040, alpha: 0)], [0.2, 1])
+                let sk = E(26, 28, 13, 13)
+                ink(c, sk, Ink.bone, lw: 2)
+                fill(c, E(21, 28, 4, 4.5), Ink.black)
+                fill(c, E(31, 28, 4, 4.5), Ink.black)
+                glowDot(c, 21, 28, 3.5, Ink.blood)
+                glowDot(c, 31, 28, 3.5, Ink.blood)
+                ink(c, P([(13, 18), (16, 6), (21, 14), (26, 3), (31, 14), (36, 6), (39, 18)]), Ink.gold, lw: 1.6)
+                ink(c, Rr(20, 38, 12, 7), Ink.bone, lw: 1.4)
+            }
+        case .rest:
+            return make("icon_rest", 52, 52) { c in
+                radial(c, 26, 26, 26, [UIColor(hex: 0x7ad8ff, alpha: 0.4), UIColor(hex: 0x7ad8ff, alpha: 0)], [0.2, 1])
+                let cup = P([(10, 22), (42, 22), (36, 38), (16, 38)])
+                ink(c, cup, UIColor(hex: 0x8a8278), lw: 2)
+                fill(c, E(26, 22, 16, 4), Ink.blood)
+                ink(c, Rr(22, 38, 8, 6), UIColor(hex: 0x8a8278), lw: 1.4)
+                ink(c, Rr(15, 44, 22, 4, 2), UIColor(hex: 0x8a8278), lw: 1.4)
+                line(c, [CGPoint(x: 26, y: 18), CGPoint(x: 26, y: 6)], UIColor(hex: 0xff5060), 2.4)
+                circle(c, 26, 5, 2.4, UIColor(hex: 0xff5060))
+            }
+        case .altar:
+            return make("icon_altar", 52, 52) { c in
+                radial(c, 26, 26, 26, [UIColor(hex: 0xc070ff, alpha: 0.5), UIColor(hex: 0xc070ff, alpha: 0)], [0.2, 1])
+                ink(c, P([(8, 30), (44, 30), (40, 46), (12, 46)]), UIColor(hex: 0x5a5260), lw: 2)
+                ink(c, Rr(6, 26, 40, 6, 2), UIColor(hex: 0x7a7280), lw: 1.4)
+                for x in [CGFloat(16), 26, 36] {
+                    ink(c, Rr(x - 3, 14, 6, 12, 1.5), Ink.bone, lw: 1)
+                    glowDot(c, x, 11, 3.5, UIColor(hex: 0xffb060))
+                }
+                stroke(c, P([(26, 33), (31, 38), (26, 43), (21, 38)]), UIColor(hex: 0xe8c0ff), 1.4)
+            }
+        case .relic:
+            return make("icon_relic", 52, 52) { c in
+                radial(c, 26, 26, 26, [UIColor(hex: 0xffd070, alpha: 0.5), UIColor(hex: 0xffd070, alpha: 0)], [0.2, 1])
+                line(c, [CGPoint(x: 14, y: 4), CGPoint(x: 26, y: 18), CGPoint(x: 38, y: 4)], Ink.gold, 2)
+                let gem = P([(26, 16), (38, 28), (26, 46), (14, 28)])
+                ink(c, gem, Ink.gold, lw: 2)
+                let inner = P([(26, 22), (32, 29), (26, 39), (20, 29)])
+                fill(c, inner, Ink.blood)
+                fill(c, P([(26, 22), (29, 29), (26, 39), (23, 29)]), Ink.blood.scaled(1.5))
+                stroke(c, inner, Ink.black, 1.2)
             }
         case .boss:
             return make("icon_boss", 52, 52) { c in

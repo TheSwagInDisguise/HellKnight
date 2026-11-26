@@ -73,9 +73,53 @@ extension UIColor {
 
 enum Font {
     static let title = "Copperplate-Bold"
-    static let heavy = "AvenirNext-Heavy"
-    static let bold = "AvenirNext-Bold"
-    static let medium = "AvenirNext-DemiBold"
+    static let heavy = "Copperplate-Bold"
+    static let bold = "Cochin-Bold"
+    static let medium = "Cochin"
+}
+
+/// The ink palette shared by every area.
+enum Ink {
+    static let black = UIColor(hex: 0x0b0908)
+    static let bone = UIColor(hex: 0xebe0c8)
+    static let boneDark = UIColor(hex: 0xb0a184)
+    static let steel = UIColor(hex: 0x2b2724)
+    static let blood = UIColor(hex: 0xc4161d)
+    static let gold = UIColor(hex: 0xcda552)
+    static let goldDark = UIColor(hex: 0x6b5222)
+    static let panel = UIColor(hex: 0x130d0b)
+}
+
+// MARK: - Isometric projection
+// Game logic runs on a flat ground plane. The world node is rotated 45° and squashed
+// vertically by half, which turns the ground plane into a true isometric diamond.
+
+let isoK: CGFloat = 0.70710678
+
+func isoProject(_ p: CGPoint) -> CGPoint {
+    CGPoint(x: (p.x - p.y) * isoK, y: (p.x + p.y) * isoK * 0.5)
+}
+
+/// Screen-space angle of a ground-plane direction.
+func screenAngle(_ groundAngle: CGFloat) -> CGFloat {
+    isoProject(CGPoint(angle: groundAngle)).angle
+}
+
+/// Converts a screen-space stick vector into a ground-plane vector of the same magnitude.
+func groundFromScreen(_ v: CGPoint) -> CGPoint {
+    let m = v.length
+    if m < 0.0001 { return .zero }
+    return CGPoint(x: v.x + 2 * v.y, y: 2 * v.y - v.x).normalized * m
+}
+
+/// A node whose children render upright (unrotated, unsquashed) inside the isometric world.
+final class Billboard: SKNode {
+    override init() {
+        super.init()
+        zRotation = -.pi / 4
+        yScale = 2
+    }
+    required init?(coder aDecoder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
 func makeLabel(_ text: String, size: CGFloat, color: UIColor = .white, font: String = Font.bold,
@@ -136,10 +180,9 @@ struct Palette {
     let name: String
     let floor: UIColor
     let floorAlt: UIColor
-    let grout: UIColor
-    let crack: UIColor
-    let wall: UIColor
-    let wallDark: UIColor
+    let line: UIColor
+    let stone: UIColor
+    let stoneDark: UIColor
     let accent: UIColor
     let ember: UIColor
     let bg: UIColor
@@ -148,19 +191,19 @@ struct Palette {
         switch depth {
         case 0:
             return Palette(name: "Cinder Halls",
-                           floor: UIColor(hex: 0x2b1814), floorAlt: UIColor(hex: 0x341d17), grout: UIColor(hex: 0x160a07),
-                           crack: UIColor(hex: 0xff6a1a), wall: UIColor(hex: 0x4e2c22), wallDark: UIColor(hex: 0x22110c),
-                           accent: UIColor(hex: 0xff7a2a), ember: UIColor(hex: 0xff8a30), bg: UIColor(hex: 0x080302))
+                           floor: UIColor(hex: 0x2c231e), floorAlt: UIColor(hex: 0x32271f), line: UIColor(hex: 0xdccaa6),
+                           stone: UIColor(hex: 0x54473c), stoneDark: UIColor(hex: 0x1e1814),
+                           accent: UIColor(hex: 0xff6a1f), ember: UIColor(hex: 0xff8a3a), bg: UIColor(hex: 0x070504))
         case 1:
             return Palette(name: "Ossuary Wastes",
-                           floor: UIColor(hex: 0x27242d), floorAlt: UIColor(hex: 0x2e2a35), grout: UIColor(hex: 0x111016),
-                           crack: UIColor(hex: 0x9cff7a), wall: UIColor(hex: 0x48424f), wallDark: UIColor(hex: 0x1c1a22),
-                           accent: UIColor(hex: 0xa8ff8a), ember: UIColor(hex: 0x9aff7a), bg: UIColor(hex: 0x050407))
+                           floor: UIColor(hex: 0x26271f), floorAlt: UIColor(hex: 0x2b2c23), line: UIColor(hex: 0xdcd8bd),
+                           stone: UIColor(hex: 0x4c4d40), stoneDark: UIColor(hex: 0x1a1b15),
+                           accent: UIColor(hex: 0x9dff6e), ember: UIColor(hex: 0xb8ff8a), bg: UIColor(hex: 0x050604))
         default:
             return Palette(name: "Abyssal Throne",
-                           floor: UIColor(hex: 0x131b2f), floorAlt: UIColor(hex: 0x182139), grout: UIColor(hex: 0x070b16),
-                           crack: UIColor(hex: 0x7a5cff), wall: UIColor(hex: 0x2c3155), wallDark: UIColor(hex: 0x0e1126),
-                           accent: UIColor(hex: 0x8f72ff), ember: UIColor(hex: 0xb08aff), bg: UIColor(hex: 0x020308))
+                           floor: UIColor(hex: 0x1f1f2b), floorAlt: UIColor(hex: 0x242331), line: UIColor(hex: 0xd2cbe6),
+                           stone: UIColor(hex: 0x403e58), stoneDark: UIColor(hex: 0x14131d),
+                           accent: UIColor(hex: 0x9a7cff), ember: UIColor(hex: 0xb59cff), bg: UIColor(hex: 0x040309))
         }
     }
 }

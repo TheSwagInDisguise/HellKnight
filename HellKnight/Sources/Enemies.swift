@@ -32,13 +32,15 @@ class Enemy: SKNode {
     var showsBar = true
     var deathColor = UIColor(hex: 0xff5030)
 
+    let up = Billboard()
     let sprite: SKSpriteNode
     let shadowNode: SKSpriteNode
     let statusGlow: SKSpriteNode
     let hpBack: SKSpriteNode
     let hpFill: SKSpriteNode
+    let bodyHeight: CGFloat
 
-    init(kind: EnemyKind, depth: Int, texture: SKTexture, spriteSize: CGFloat, radius: CGFloat, hp: CGFloat, speed: CGFloat) {
+    init(kind: EnemyKind, depth: Int, texture: SKTexture, spriteSize: CGSize, radius: CGFloat, hp: CGFloat, speed: CGFloat) {
         self.kind = kind
         self.depth = depth
         let scale = 1 + 0.5 * CGFloat(depth)
@@ -47,30 +49,37 @@ class Enemy: SKNode {
         self.radius = radius
         self.baseSpeed = speed
         self.dmgMult = 1 + 0.3 * CGFloat(depth)
-        sprite = SKSpriteNode(texture: texture, size: CGSize(width: spriteSize, height: spriteSize))
-        shadowNode = SKSpriteNode(texture: Tex.shadow(), size: CGSize(width: radius * 2.4, height: radius * 1.1))
-        statusGlow = SKSpriteNode(texture: Tex.glow(), size: CGSize(width: radius * 3.6, height: radius * 3.6))
+        self.bodyHeight = spriteSize.height
+        let sp = SKSpriteNode(texture: texture, size: spriteSize)
+        sp.anchorPoint = CGPoint(x: 0.5, y: 0.04)
+        sprite = sp
+        shadowNode = SKSpriteNode(texture: Tex.softShadow(), size: CGSize(width: radius * 2.8, height: radius * 2.8))
+        statusGlow = SKSpriteNode(texture: Tex.glow(), size: CGSize(width: spriteSize.width * 1.6, height: spriteSize.height * 1.4))
         let bw = max(36, radius * 2)
-        hpBack = SKSpriteNode(color: UIColor(white: 0, alpha: 0.7), size: CGSize(width: bw + 2, height: 6))
-        hpFill = SKSpriteNode(color: UIColor(hex: 0xe0303a), size: CGSize(width: bw, height: 4))
+        hpBack = SKSpriteNode(color: Ink.black, size: CGSize(width: bw + 4, height: 7))
+        hpFill = SKSpriteNode(color: Ink.blood, size: CGSize(width: bw, height: 3.5))
         super.init()
-        shadowNode.position = CGPoint(x: 0, y: -radius * 0.85)
         shadowNode.zPosition = -1
         addChild(shadowNode)
+        addChild(up)
         statusGlow.blendMode = .add
         statusGlow.colorBlendFactor = 1
         statusGlow.alpha = 0
         statusGlow.zPosition = -0.5
-        addChild(statusGlow)
-        addChild(sprite)
-        hpBack.position = CGPoint(x: 0, y: spriteSize * 0.5 + 8)
+        statusGlow.position = CGPoint(x: 0, y: spriteSize.height * 0.45)
+        up.addChild(statusGlow)
+        up.addChild(sprite)
+        hpBack.position = CGPoint(x: 0, y: spriteSize.height + 8)
         hpBack.zPosition = 5
         hpBack.isHidden = true
+        let edge = SKSpriteNode(color: Ink.goldDark, size: CGSize(width: bw + 6, height: 9))
+        edge.zPosition = -0.1
+        hpBack.addChild(edge)
         hpFill.anchorPoint = CGPoint(x: 0, y: 0.5)
         hpFill.position = CGPoint(x: -bw / 2, y: 0)
         hpFill.zPosition = 0.1
         hpBack.addChild(hpFill)
-        addChild(hpBack)
+        up.addChild(hpBack)
     }
 
     required init?(coder aDecoder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -84,6 +93,7 @@ class Enemy: SKNode {
         dmgMult *= 1.25
         radius *= 1.15
         sprite.setScale(1.15)
+        statusGlow.color = UIColor(hex: 0xffc040)
         let ring = SKSpriteNode(texture: Tex.ringTex(), size: CGSize(width: radius * 2.7, height: radius * 2.7))
         ring.color = UIColor(hex: 0xffc040)
         ring.colorBlendFactor = 1
@@ -124,7 +134,7 @@ class Enemy: SKNode {
             think(dt, game: game)
         }
         position = game.room.resolve(position, radius)
-        zPosition = game.depthZ(position.y)
+        zPosition = game.depthZ(position)
     }
 
     func think(_ dt: CGFloat, game: GameScene) {}
@@ -132,13 +142,15 @@ class Enemy: SKNode {
     func moveToward(_ target: CGPoint, _ dt: CGFloat, speedMult: CGFloat = 1) {
         let d = (target - position).normalized
         position = position + d * (moveSpeed * speedMult * dt)
-        face(d.x)
+        face(d)
     }
 
-    func face(_ dx: CGFloat) {
-        if abs(dx) > 0.05 {
+    /// Flips the sprite to face a ground-plane direction as seen on screen.
+    func face(_ d: CGPoint) {
+        let sx = d.x - d.y
+        if abs(sx) > 0.05 {
             let s = abs(sprite.xScale)
-            sprite.xScale = dx < 0 ? -s : s
+            sprite.xScale = sx < 0 ? -s : s
         }
     }
 
@@ -173,7 +185,7 @@ class Enemy: SKNode {
     func windupFlash(_ duration: CGFloat) {
         sprite.removeAction(forKey: "flash")
         sprite.run(.sequence([
-            .colorize(with: UIColor(hex: 0xff2010), colorBlendFactor: 0.7, duration: TimeInterval(duration * 0.8)),
+            .colorize(with: Ink.blood, colorBlendFactor: 0.75, duration: TimeInterval(duration * 0.8)),
             .colorize(withColorBlendFactor: 0, duration: TimeInterval(duration * 0.2)),
         ]), withKey: "flash")
     }
@@ -188,7 +200,7 @@ final class Imp: Enemy {
     var hitDone = false
 
     init(depth: Int) {
-        super.init(kind: .imp, depth: depth, texture: Tex.imp(), spriteSize: 42, radius: 16, hp: 42, speed: 140)
+        super.init(kind: .imp, depth: depth, texture: Tex.imp(), spriteSize: CGSize(width: 52, height: 58), radius: 16, hp: 42, speed: 140)
         timer = rnd(0.3, 1.0)
         deathColor = UIColor(hex: 0xff5030)
     }
@@ -216,7 +228,7 @@ final class Imp: Enemy {
             }
         case .lunge:
             position = position + dir * (580 * dt)
-            face(dir.x)
+            face(dir)
             if !hitDone && position.distance(to: p) < radius + game.player.radius + 4 {
                 hitDone = true
                 game.hurtPlayer(10 * dmgMult, from: position)
@@ -244,7 +256,7 @@ final class Archer: Enemy {
     var strafe: CGFloat = 1
 
     init(depth: Int) {
-        super.init(kind: .archer, depth: depth, texture: Tex.archer(), spriteSize: 44, radius: 16, hp: 34, speed: 115)
+        super.init(kind: .archer, depth: depth, texture: Tex.archer(), spriteSize: CGSize(width: 56, height: 66), radius: 16, hp: 34, speed: 115)
         timer = rnd(1.0, 2.0)
         strafe = chance(0.5) ? 1 : -1
         deathColor = UIColor(hex: 0xe0d6bf)
@@ -256,7 +268,7 @@ final class Archer: Enemy {
         let p = game.player.position
         let d = p - position
         let dist = d.length
-        face(d.x)
+        face(d)
         timer -= dt
         if aiming {
             if timer > 0.3 {
@@ -304,7 +316,7 @@ final class Brute: Enemy {
     var hitDone = false
 
     init(depth: Int) {
-        super.init(kind: .brute, depth: depth, texture: Tex.brute(), spriteSize: 70, radius: 28, hp: 150, speed: 75)
+        super.init(kind: .brute, depth: depth, texture: Tex.brute(), spriteSize: CGSize(width: 86, height: 94), radius: 28, hp: 150, speed: 75)
         knockResist = 0.25
         timer = rnd(1.0, 2.0)
         deathColor = UIColor(hex: 0xb070d0)
@@ -322,7 +334,7 @@ final class Brute: Enemy {
                 s = .windup
                 timer = 0.8
                 dir = (p - position).normalized
-                face(dir.x)
+                face(dir)
                 windupFlash(0.8)
                 game.telegraphLine(from: position, angle: dir.angle, length: 440, width: radius * 2, duration: 0.8)
             }
@@ -361,10 +373,15 @@ final class Wisp: Enemy {
     var phase: CGFloat = 0
 
     init(depth: Int) {
-        super.init(kind: .wisp, depth: depth, texture: Tex.wisp(), spriteSize: 40, radius: 14, hp: 22, speed: 160)
+        super.init(kind: .wisp, depth: depth, texture: Tex.wisp(), spriteSize: CGSize(width: 46, height: 58), radius: 14, hp: 22, speed: 160)
         phase = rnd(0, 6)
-        sprite.blendMode = .add
-        deathColor = UIColor(hex: 0x6cf0c2)
+        let acc = Palette.of(depth).accent
+        sprite.color = acc
+        sprite.colorBlendFactor = 0.45
+        sprite.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+        sprite.position = CGPoint(x: 0, y: 40)
+        shadowNode.alpha = 0.5
+        deathColor = acc
     }
 
     required init?(coder aDecoder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -375,7 +392,7 @@ final class Wisp: Enemy {
             timer -= dt
             sprite.alpha = sin(timer * 40) > 0 ? 1 : 0.4
             if timer <= 0 {
-                game.explosion(at: position, radius: 95, damage: 18 * dmgMult, hostile: true, color: UIColor(hex: 0x6cf0c2))
+                game.explosion(at: position, radius: 95, damage: 18 * dmgMult, hostile: true, color: deathColor)
                 game.killEnemy(self, rewards: false)
             }
             return
@@ -383,7 +400,7 @@ final class Wisp: Enemy {
         let d = game.player.position - position
         let perp = CGPoint(x: -d.y, y: d.x).normalized * (sin(phase) * 0.7)
         position = position + (d.normalized + perp).normalized * (moveSpeed * dt)
-        sprite.position = CGPoint(x: 0, y: sin(phase * 1.5) * 4)
+        sprite.position = CGPoint(x: 0, y: 40 + sin(phase * 1.5) * 6)
         if d.length < 90 {
             fuse = true
             timer = 0.75
@@ -399,7 +416,7 @@ final class Priest: Enemy {
     var casts = 0
 
     init(depth: Int) {
-        super.init(kind: .priest, depth: depth, texture: Tex.priest(), spriteSize: 48, radius: 18, hp: 70, speed: 85)
+        super.init(kind: .priest, depth: depth, texture: Tex.priest(), spriteSize: CGSize(width: 54, height: 74), radius: 18, hp: 70, speed: 85)
         timer = rnd(1.5, 2.5)
         deathColor = UIColor(hex: 0xc060ff)
     }
@@ -409,7 +426,7 @@ final class Priest: Enemy {
     override func think(_ dt: CGFloat, game: GameScene) {
         let p = game.player.position
         let d = p - position
-        face(d.x)
+        face(d)
         timer -= dt
         if casting {
             if timer <= 0 {
@@ -474,14 +491,14 @@ final class Boss: Enemy {
     var hitDone = false
     var phase2 = false
     var contactCD: CGFloat = 0
-    let rage = SKSpriteNode(texture: Tex.glow(), size: CGSize(width: 220, height: 220))
+    let rage = SKSpriteNode(texture: Tex.glow(), size: CGSize(width: 260, height: 300))
 
     init(depth: Int) {
         let d = min(max(depth, 0), 2)
         bossName = Boss.names[d]
-        let cols: [UInt32] = [0xff6a1a, 0xb8ff9a, 0x9a7cff]
+        let cols: [UInt32] = [0xff6a1f, 0x9dff6e, 0x9a7cff]
         color = UIColor(hex: cols[d])
-        super.init(kind: .boss, depth: depth, texture: Tex.boss(d), spriteSize: 130, radius: 50, hp: 1300, speed: 105)
+        super.init(kind: .boss, depth: depth, texture: Tex.boss(d), spriteSize: CGSize(width: 160, height: 184), radius: 50, hp: 1300, speed: 105)
         knockResist = 0
         showsBar = false
         deathColor = color
@@ -490,7 +507,8 @@ final class Boss: Enemy {
         rage.blendMode = .add
         rage.alpha = 0
         rage.zPosition = -0.6
-        addChild(rage)
+        rage.position = CGPoint(x: 0, y: 90)
+        up.addChild(rage)
     }
 
     required init?(coder aDecoder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -500,7 +518,7 @@ final class Boss: Enemy {
     override func think(_ dt: CGFloat, game: GameScene) {
         let p = game.player.position
         let d = p - position
-        face(d.x)
+        face(d)
         contactCD -= dt
         if contactCD <= 0 && d.length < radius + game.player.radius - 6 {
             contactCD = 0.8

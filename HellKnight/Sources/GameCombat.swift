@@ -41,7 +41,7 @@ extension GameScene {
             }
             if p.dashTime <= 0 { endDash() }
         } else {
-            let mv = controls.move
+            let mv = moveInput
             var speed: CGFloat = 255 * runData.moveMult
             if p.attackTimer > 0 { speed *= 0.3 }
             var delta = mv * (speed * dt)
@@ -64,11 +64,11 @@ extension GameScene {
                 }
             }
         }
-        p.zPosition = depthZ(p.position.y)
+        p.zPosition = depthZ(p.position)
     }
 
     func aimAngle(range: CGFloat) -> CGFloat {
-        let mv = controls.move
+        let mv = moveInput
         let steering = mv.length > 0.2
         let base = steering ? mv.angle : player.facing
         var best: Enemy?
@@ -136,6 +136,7 @@ extension GameScene {
             let range = 140 * runData.rangeMult
             p.spin()
             let s = SKSpriteNode(texture: Tex.slash(arcDeg: 340), size: CGSize(width: range * 2.3, height: range * 2.3))
+            s.zRotation = rnd(0, 2 * .pi)
             s.position = p.position
             s.color = col
             s.colorBlendFactor = 0.7
@@ -160,7 +161,7 @@ extension GameScene {
             g.colorBlendFactor = 1
             g.blendMode = .add
             g.zPosition = -1
-            pr.addChild(g)
+            pr.art.addChild(g)
         case .slam:
             let range = 160 * runData.rangeMult
             p.playSwing(angle: p.facing, arcDeg: 0)
@@ -191,7 +192,7 @@ extension GameScene {
         guard let p = player else { return }
         p.dashCharges -= 1
         if p.dashRecharge <= 0 { p.dashRecharge = 0.55 }
-        let mv = controls.move
+        let mv = moveInput
         let dir = mv.length > 0.2 ? mv.normalized : CGPoint(angle: p.facing)
         p.dashDir = dir
         p.dashTime = 0.16
@@ -207,7 +208,7 @@ extension GameScene {
                 .sorted { $0.position.distance(to: p.position) < $1.position.distance(to: p.position) }
                 .prefix(3)
             for e in targets {
-                lightningBolt(from: e.position + CGPoint(x: 0, y: 200), to: e.position)
+                lightningBolt(from: e.position, to: e.position, fromHeight: 260, toHeight: 10)
                 dealDamage(e, 14 * m * runData.damageMult, color: Patron.tempest.color)
             }
         }
@@ -242,7 +243,7 @@ extension GameScene {
             let d = pr.position - origin
             if d.length < range + 8 && (full || abs(angleDiff(d.angle, angle)) < arc / 2 + 0.25) {
                 pr.dead = true
-                burst(at: pr.position, color: .white, count: 5, speed: 120, size: 5, life: 0.25)
+                burst(at: pr.position, color: Ink.bone, count: 5, speed: 120, size: 5, life: 0.25)
             }
         }
         return hits
@@ -284,7 +285,8 @@ extension GameScene {
         guard e.alive else { return }
         e.takeDamage(amount)
         e.flashHit()
-        damageNumber(amount, at: e.position + CGPoint(x: 0, y: e.radius), color: color, crit: crit)
+        damageNumber(amount, at: e.position, height: e.bodyHeight * 0.8, color: color, crit: crit)
+        splat(at: e.position, size: crit ? 40 : 26, color: Ink.black, alpha: 0.55, fade: 1.2)
         if e.hp <= 0 {
             killEnemy(e)
         } else {
@@ -295,7 +297,7 @@ extension GameScene {
     func applyDot(_ e: Enemy, _ amount: CGFloat) {
         guard e.alive else { return }
         e.takeDamage(amount)
-        damageNumber(amount, at: e.position + CGPoint(x: 0, y: e.radius), color: Patron.pyre.color, crit: false)
+        damageNumber(amount, at: e.position, height: e.bodyHeight * 0.8, color: Patron.pyre.color, crit: false)
         if e.hp <= 0 { killEnemy(e) }
     }
 
@@ -304,6 +306,8 @@ extension GameScene {
         e.alive = false
         e.hpBack.isHidden = true
         burst(at: e.position, color: e.deathColor, count: e is Boss ? 50 : 16, speed: e is Boss ? 420 : 240)
+        splat(at: e.position, size: e is Boss ? 260 : 80 + e.radius * 2, color: Ink.black, alpha: 0.85, fade: 14)
+        splat(at: e.position, size: e is Boss ? 160 : 40 + e.radius, color: Ink.blood, alpha: 0.6, fade: 14)
         sfx(.death, 0.5)
         if rewards {
             runData.kills += 1
@@ -332,7 +336,7 @@ extension GameScene {
             let candidates = enemies.filter { $0.alive && !hitSet.contains(ObjectIdentifier($0)) && $0.position.distance(to: from) < 220 }
             guard let next = candidates.min(by: { $0.position.distance(to: from) < $1.position.distance(to: from) }) else { break }
             hitSet.insert(ObjectIdentifier(next))
-            lightningBolt(from: from, to: next.position)
+            lightningBolt(from: from, to: next.position, fromHeight: 30, toHeight: 30)
             dealDamage(next, damage * runData.damageMult, color: Patron.tempest.color)
             current = next
         }
@@ -379,7 +383,7 @@ extension GameScene {
         guard state == .playing, let p = player else { return }
         if p.invuln > 0 || p.dashTime > 0 { return }
         if runData.has(.evasion) && chance(min(0.6, 0.1 * runData.pm(.evasion))) {
-            floatText("DODGE", at: p.position + CGPoint(x: 0, y: 40), color: Patron.umbral.color)
+            floatText("DODGE", at: p.position, height: 80, color: Patron.umbral.color)
             p.invuln = 0.3
             return
         }
@@ -388,7 +392,8 @@ extension GameScene {
         runData.hp -= dmg
         p.invuln = 0.75
         p.flashHurt()
-        damageNumber(dmg, at: p.position + CGPoint(x: 0, y: 20), color: UIColor(hex: 0xff4040), crit: false)
+        damageNumber(dmg, at: p.position, height: 70, color: Ink.blood.scaled(1.4), crit: false)
+        splat(at: p.position, size: 46, color: Ink.blood, alpha: 0.8, fade: 4)
         addShake(7)
         hitstop = 0.06
         hud.flashHurt()
@@ -418,7 +423,7 @@ extension GameScene {
         runData.hp = min(runData.maxHp, runData.hp + amt)
         let gained = runData.hp - before
         if gained >= 1, let p = player {
-            floatText("+\(Int(gained.rounded()))", at: p.position + CGPoint(x: 0, y: 36), color: UIColor(hex: 0x60ff80), size: quiet ? 13 : 18)
+            floatText("+\(Int(gained.rounded()))", at: p.position, height: 90, color: UIColor(hex: 0x7dff8a), size: quiet ? 13 : 18)
         }
     }
 
@@ -439,15 +444,25 @@ extension GameScene {
         pr.slot = slot
         pr.knock = knock
         if let c = color {
-            pr.color = c
-            pr.colorBlendFactor = 1
-            pr.blendMode = .add
+            pr.tint = c
+            pr.art.color = c
+            pr.art.colorBlendFactor = 1
+            pr.art.blendMode = .add
             let core = SKSpriteNode(texture: Tex.spark(), size: CGSize(width: size.width * 0.55, height: size.height * 0.55))
             core.zPosition = 1
-            pr.addChild(core)
+            pr.art.addChild(core)
+            let halo = SKSpriteNode(texture: Tex.glow(), size: CGSize(width: size.width * 2.2, height: size.height * 2.2))
+            halo.color = c
+            halo.colorBlendFactor = 1
+            halo.blendMode = .add
+            halo.alpha = 0.45
+            halo.zPosition = -1
+            pr.art.addChild(halo)
+        } else {
+            pr.tint = Ink.bone
         }
-        pr.zRotation = vel.angle
-        pr.zPosition = 30
+        pr.art.zRotation = screenAngle(vel.angle)
+        pr.zPosition = depthZ(p) + 0.5
         world.addChild(pr)
         projectiles.append(pr)
         return pr
@@ -463,13 +478,14 @@ extension GameScene {
         for pr in projectiles where !pr.dead {
             pr.life -= dt
             pr.position = pr.position + pr.vel * dt
+            pr.zPosition = depthZ(pr.position) + 0.5
             if pr.life <= 0 {
                 pr.dead = true
                 continue
             }
             if room.blocked(pr.position, pr.radius * 0.4) {
                 pr.dead = true
-                burst(at: pr.position, color: pr.hostile ? pr.color : .white, count: 4, speed: 90, size: 5, life: 0.25)
+                burst(at: pr.position, color: pr.tint, count: 4, speed: 90, size: 5, life: 0.25)
                 continue
             }
             if pr.hostile {
@@ -487,7 +503,7 @@ extension GameScene {
                         pr.pierce -= 1
                         if pr.pierce < 0 {
                             pr.dead = true
-                            burst(at: pr.position, color: pr.color, count: 8, speed: 160)
+                            burst(at: pr.position, color: pr.tint, count: 8, speed: 160)
                             break
                         }
                     }
@@ -526,7 +542,7 @@ extension GameScene {
                     collect(r) {}
                 } else if pk.denyCD <= 0 {
                     pk.denyCD = 1.5
-                    floatText("Need \(pk.price) gold", at: pk.position + CGPoint(x: 0, y: 50), color: UIColor(hex: 0xf0c040))
+                    floatText("Need \(pk.price) gold", at: pk.position, height: 130, color: Ink.gold)
                 }
             } else {
                 pk.taken = true

@@ -5,7 +5,9 @@ enum GameState { case playing, choosing, transition, dead, victory, paused }
 
 final class GameScene: BaseScene {
     let runData: RunState
+    let isoRoot = SKNode()
     let world = SKNode()
+    let topLayer = SKNode()
     let cam = SKCameraNode()
     let hud = HUD()
     let controls = Controls()
@@ -40,7 +42,12 @@ final class GameScene: BaseScene {
 
     override func didMove(to view: SKView) {
         backgroundColor = Palette.of(runData.depth).bg
-        addChild(world)
+        isoRoot.yScale = 0.5
+        world.zRotation = .pi / 4
+        isoRoot.addChild(world)
+        addChild(isoRoot)
+        topLayer.zPosition = 800
+        addChild(topLayer)
         addChild(cam)
         camera = cam
         hud.zPosition = 1000
@@ -62,7 +69,7 @@ final class GameScene: BaseScene {
     override func relayout() { layoutUI() }
 
     func layoutUI() {
-        let s = clamp(560 / max(size.height, 1), 0.7, 1.6)
+        let s = clamp(600 / max(size.height, 1), 0.75, 1.7)
         cam.setScale(s)
         hud.setScale(1 / s)
         let insets = view?.safeAreaInsets ?? .zero
@@ -119,7 +126,16 @@ final class GameScene: BaseScene {
         }
     }
 
-    func depthZ(_ y: CGFloat) -> CGFloat { 10 + (3000 - y) * 0.001 }
+    /// Draw order for upright objects: things lower on screen are drawn in front.
+    func depthZ(_ p: CGPoint) -> CGFloat { 10 + (8000 - (p.x + p.y)) * 0.0005 }
+
+    /// Joystick input converted to a ground-plane direction.
+    var moveInput: CGPoint { groundFromScreen(controls.move) }
+
+    /// Scene-space (screen) position of a ground point, raised by `height`.
+    func screenPoint(_ p: CGPoint, height: CGFloat = 0) -> CGPoint {
+        isoProject(p) + CGPoint(x: 0, y: height)
+    }
 
     // MARK: Camera
 
@@ -128,16 +144,19 @@ final class GameScene: BaseScene {
         let vw = size.width * cam.xScale
         let vh = size.height * cam.yScale
         let b = room.bounds
-        let ext = CGRect(x: b.minX - 50, y: b.minY - 50, width: b.width + 100, height: b.height + 50 + 140)
+        let left = isoProject(CGPoint(x: b.minX, y: b.maxY)).x - 60
+        let right = isoProject(CGPoint(x: b.maxX, y: b.minY)).x + 60
+        let bottom = isoProject(CGPoint(x: b.minX, y: b.minY)).y - 60
+        let top = isoProject(CGPoint(x: b.maxX, y: b.maxY)).y + Tex.wallH + 30
         var t = target
-        t.x = ext.width <= vw ? ext.midX : clamp(t.x, ext.minX + vw / 2, ext.maxX - vw / 2)
-        t.y = ext.height <= vh ? ext.midY : clamp(t.y, ext.minY + vh / 2, ext.maxY - vh / 2)
+        t.x = right - left <= vw ? (left + right) / 2 : clamp(t.x, left + vw / 2, right - vw / 2)
+        t.y = top - bottom <= vh ? (top + bottom) / 2 : clamp(t.y, bottom + vh / 2, top - vh / 2)
         return t
     }
 
     func updateCamera(_ dt: CGFloat) {
         guard let p = player else { return }
-        let target = clampCam(p.position + CGPoint(x: 0, y: 30))
+        let target = clampCam(isoProject(p.position) + CGPoint(x: 0, y: 40))
         camBase = camBase + (target - camBase) * min(1, dt * 7)
         var off = CGPoint.zero
         if shakeAmt > 0.2 {

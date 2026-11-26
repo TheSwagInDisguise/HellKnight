@@ -6,7 +6,7 @@ extension GameScene {
     // MARK: - Reward collection
 
     func collect(_ r: Reward, completion: @escaping () -> Void) {
-        let at = player.position + CGPoint(x: 0, y: 44)
+        let at = player.position
         switch r {
         case .boon(let pat):
             sfx(.boon)
@@ -22,7 +22,7 @@ extension GameScene {
         case .gold:
             let g = Int(rnd(55, 85)) + 25 * runData.depth
             runData.gold += g
-            floatText("+\(g) Gold", at: at, color: UIColor(hex: 0xf0c040), size: 18)
+            floatText("+\(g) Gold", at: at, color: Ink.gold, size: 18)
             completion()
         case .souls:
             let s = 12 + 8 * runData.depth
@@ -114,9 +114,34 @@ extension GameScene {
     private func makeOverlay() -> SKNode {
         let o = SKNode()
         o.zPosition = 500
-        let dim = SKSpriteNode(color: UIColor(white: 0, alpha: 0.8), size: CGSize(width: size.width + 60, height: size.height + 60))
+        let dim = SKSpriteNode(color: UIColor(white: 0, alpha: 0.78), size: CGSize(width: size.width + 60, height: size.height + 60))
         o.addChild(dim)
+        let v = SKSpriteNode(texture: Tex.inkVignette(), size: CGSize(width: size.width * 1.05, height: size.height * 1.1))
+        v.zPosition = 0.1
+        o.addChild(v)
         return o
+    }
+
+    private func addHeading(_ o: SKNode, _ title: String, _ subtitle: String, color: UIColor, y: CGFloat) {
+        let fs = min(28, size.width * 0.036)
+        let sh = makeLabel(title, size: fs, color: Ink.black, font: Font.title)
+        sh.position = CGPoint(x: 2, y: y - 2)
+        sh.zPosition = 1
+        o.addChild(sh)
+        let t = makeLabel(title, size: fs, color: color, font: Font.title)
+        t.position = CGPoint(x: 0, y: y)
+        t.zPosition = 1.1
+        o.addChild(t)
+        let d = SKSpriteNode(texture: Tex.divider(320), size: CGSize(width: 320, height: 14))
+        d.position = CGPoint(x: 0, y: y - 20)
+        d.zPosition = 1
+        o.addChild(d)
+        if !subtitle.isEmpty {
+            let st = makeLabel(subtitle, size: 14, color: Ink.bone.withAlphaComponent(0.85), font: Font.medium)
+            st.position = CGPoint(x: 0, y: y - 38)
+            st.zPosition = 1
+            o.addChild(st)
+        }
     }
 
     func showChoices(title: String, subtitle: String, accent: UIColor, cards: [ChoiceCard]) {
@@ -125,62 +150,60 @@ extension GameScene {
         let W = size.width
         let H = size.height
         let o = makeOverlay()
-        let t = makeLabel(title, size: min(26, W * 0.034), color: accent, font: Font.title)
-        t.position = CGPoint(x: 0, y: H / 2 - 30)
-        o.addChild(t)
-        let st = makeLabel(subtitle, size: 13, color: UIColor(white: 1, alpha: 0.75), font: Font.medium)
-        st.position = CGPoint(x: 0, y: H / 2 - 52)
-        o.addChild(st)
+        addHeading(o, title, subtitle, color: accent, y: H / 2 - 28)
 
         let n = CGFloat(max(cards.count, 1))
-        let gap: CGFloat = 14
-        let cw = min(240, (W - 60 - (n - 1) * gap) / n)
-        let ch = min(270, H - 100)
-        let small = cw < 200
+        let gap: CGFloat = 16
+        let cw = min(220, (W - 60 - (n - 1) * gap) / n)
+        let ch = min(300, H - 96)
+        let small = cw < 190
         for (i, c) in cards.enumerated() {
             let x = (CGFloat(i) - (n - 1) / 2) * (cw + gap)
-            let b = Button("", size: CGSize(width: cw, height: ch), color: UIColor(hex: 0x170c0a, alpha: 0.96), stroke: c.color) { [weak self] in
+            let b = Button("", size: CGSize(width: cw, height: ch), texture: Tex.card(cw, ch, accent: c.color)) { [weak self] in
                 self?.closeOverlay()
                 c.action()
             }
             b.priority = 10
-            b.bg.lineWidth = 2.5
-            b.position = CGPoint(x: x, y: -32)
+            b.position = CGPoint(x: x, y: -40)
+            b.zPosition = 2
             let top = ch / 2
             if let r = c.icon {
-                let s = SKSpriteNode(texture: Tex.icon(r), size: CGSize(width: 36, height: 36))
-                s.position = CGPoint(x: 0, y: top - 26)
+                let s = SKSpriteNode(texture: Tex.icon(r), size: CGSize(width: 40, height: 40))
+                s.position = CGPoint(x: 0, y: top - 34)
                 s.zPosition = 2
                 b.addChild(s)
             }
             let tag = makeLabel(c.tag, size: 10, color: c.color, font: Font.heavy)
-            tag.position = CGPoint(x: 0, y: top - 53)
+            tag.position = CGPoint(x: 0, y: top - 68)
             tag.zPosition = 2
             b.addChild(tag)
-            let tl = makeLabel(c.title, size: small ? 14 : 17, color: .white, font: Font.heavy)
-            tl.position = CGPoint(x: 0, y: top - 72)
+            let tl = makeLabel(c.title, size: small ? 14 : 16, color: Ink.bone, font: Font.title)
+            tl.numberOfLines = 2
+            tl.preferredMaxLayoutWidth = cw - 20
+            tl.position = CGPoint(x: 0, y: top - 88)
             tl.zPosition = 2
             b.addChild(tl)
-            let sl = makeLabel(c.sub, size: 10, color: c.accent, font: Font.bold)
+            let sl = makeLabel(c.sub, size: 11, color: c.accent, font: Font.bold)
             sl.numberOfLines = 2
-            sl.preferredMaxLayoutWidth = cw - 14
-            sl.position = CGPoint(x: 0, y: top - 92)
+            sl.preferredMaxLayoutWidth = cw - 22
+            sl.verticalAlignmentMode = .top
+            sl.position = CGPoint(x: 0, y: top - 120)
             sl.zPosition = 2
             b.addChild(sl)
-            let dl = makeLabel(c.desc, size: small ? 11.5 : 13, color: UIColor(white: 0.92, alpha: 1), font: Font.medium)
+            let dl = makeLabel(c.desc, size: small ? 12 : 13.5, color: Ink.bone.withAlphaComponent(0.92), font: Font.medium)
             dl.numberOfLines = 0
             dl.lineBreakMode = .byWordWrapping
-            dl.preferredMaxLayoutWidth = cw - 20
+            dl.preferredMaxLayoutWidth = cw - 26
             dl.verticalAlignmentMode = .top
-            dl.position = CGPoint(x: 0, y: top - 108)
+            dl.position = CGPoint(x: 0, y: top - 146)
             dl.zPosition = 2
             b.addChild(dl)
             o.addChild(b)
             b.alpha = 0
             b.setScale(0.85)
             b.run(.sequence([
-                .wait(forDuration: 0.08 * Double(i)),
-                .group([.fadeIn(withDuration: 0.18), .scale(to: 1, duration: 0.18)]),
+                .wait(forDuration: 0.1 * Double(i)),
+                .group([.fadeIn(withDuration: 0.2), .scale(to: 1, duration: 0.2)]),
             ]))
         }
         hud.addChild(o)
@@ -202,9 +225,14 @@ extension GameScene {
         let W = size.width
         let H = size.height
         let o = makeOverlay()
-        let t = makeLabel("PAUSED", size: 28, color: UIColor(hex: 0xffd0a0), font: Font.title)
-        t.position = CGPoint(x: 0, y: H / 2 - 34)
-        o.addChild(t)
+        addHeading(o, "PAUSED", "", color: Ink.bone, y: H / 2 - 30)
+
+        let pw = min(560, W - 60)
+        let ph = H - 150
+        let panel = SKSpriteNode(texture: Tex.panel(pw, ph), size: CGSize(width: pw, height: ph))
+        panel.position = CGPoint(x: 0, y: -8)
+        panel.zPosition = 1
+        o.addChild(panel)
 
         var lines: [String] = []
         lines.append("\(runData.weapon.name)  ·  Damage x\(String(format: "%.2f", runData.damageMult))  ·  Souls \(runData.souls)  ·  Revives \(runData.revives)")
@@ -216,26 +244,29 @@ extension GameScene {
             if let r = runData.passives[pa] { lines.append("\(pa.name) (\(r.name), \(pa.patron.short))") }
         }
         if runData.slots.isEmpty && runData.passives.isEmpty { lines.append("No boons yet. Clear chambers to earn them.") }
-        let list = makeLabel(lines.joined(separator: "\n"), size: 13, color: UIColor(white: 0.9, alpha: 1), font: Font.medium)
+        let list = makeLabel(lines.joined(separator: "\n"), size: 14, color: Ink.bone, font: Font.medium)
         list.numberOfLines = 0
-        list.preferredMaxLayoutWidth = W - 80
+        list.preferredMaxLayoutWidth = pw - 40
         list.verticalAlignmentMode = .top
-        list.position = CGPoint(x: 0, y: H / 2 - 62)
-        o.addChild(list)
+        list.position = CGPoint(x: 0, y: ph / 2 - 26)
+        list.zPosition = 2
+        panel.addChild(list)
 
         let resume = Button("Resume", size: CGSize(width: 170, height: 44), fontSize: 18) { [weak self] in
             self?.closeOverlay()
         }
         resume.priority = 10
-        resume.position = CGPoint(x: -100, y: -H / 2 + 46)
+        resume.zPosition = 3
+        resume.position = CGPoint(x: -100, y: -H / 2 + 40)
         o.addChild(resume)
-        let quit = Button("Abandon Run", size: CGSize(width: 170, height: 44), color: UIColor(hex: 0x3a0808), stroke: UIColor(hex: 0xff4030), fontSize: 16) { [weak self] in
+        let quit = Button("Abandon Run", size: CGSize(width: 170, height: 44), accent: Ink.blood, fontSize: 15) { [weak self] in
             guard let self = self else { return }
             self.recordRunEnd(won: false)
             self.goToSanctum()
         }
         quit.priority = 10
-        quit.position = CGPoint(x: 100, y: -H / 2 + 46)
+        quit.zPosition = 3
+        quit.position = CGPoint(x: 100, y: -H / 2 + 40)
         o.addChild(quit)
         hud.addChild(o)
         overlay = o
@@ -250,7 +281,8 @@ extension GameScene {
         sfx(.death)
         sfx(.playerHurt)
         if let p = player {
-            burst(at: p.position, color: UIColor(hex: 0xff3020), count: 40, speed: 300)
+            burst(at: p.position, color: Ink.blood, count: 40, speed: 300)
+            splat(at: p.position, size: 140, color: Ink.blood, alpha: 0.9, fade: 30)
             p.run(.group([.fadeOut(withDuration: 0.9), .scale(to: 0.5, duration: 0.9)]))
         }
         recordRunEnd(won: false)
@@ -268,31 +300,49 @@ extension GameScene {
 
     func showEndScreen(won: Bool) {
         overlay?.removeFromParent()
+        let W = size.width
         let H = size.height
         let o = makeOverlay()
+        let pw = min(560, W - 60)
+        let ph = min(300, H - 60)
+        let panel = SKSpriteNode(texture: Tex.panel(pw, ph, accent: won ? Ink.gold : Ink.blood), size: CGSize(width: pw, height: ph))
+        panel.zPosition = 1
+        o.addChild(panel)
         let title = won ? "YOU ESCAPED THE ABYSS" : "SLAIN"
-        let t = makeLabel(title, size: won ? 30 : 40, color: won ? UIColor(hex: 0xffd070) : UIColor(hex: 0xff3a2a), font: Font.title)
-        t.position = CGPoint(x: 0, y: H * 0.26)
+        let tcol = won ? Ink.gold : Ink.blood.scaled(1.3)
+        let t = makeLabel(title, size: won ? 28 : 44, color: tcol, font: Font.title)
+        t.position = CGPoint(x: 0, y: ph / 2 - 46)
+        t.zPosition = 2
         o.addChild(t)
+        let d = SKSpriteNode(texture: Tex.divider(300), size: CGSize(width: 300, height: 14))
+        d.position = CGPoint(x: 0, y: ph / 2 - 76)
+        d.zPosition = 2
+        o.addChild(d)
         let pal = Palette.of(runData.depth)
         let sub = won ? "The thrones of the deep lie broken behind you... for now."
                       : "You fell in the \(pal.name), chamber \(runData.room + 1)."
-        let s = makeLabel(sub, size: 15, color: UIColor(white: 0.85, alpha: 1), font: Font.medium)
-        s.position = CGPoint(x: 0, y: H * 0.26 - 40)
+        let s = makeLabel(sub, size: 16, color: Ink.bone, font: Font.medium)
+        s.numberOfLines = 2
+        s.preferredMaxLayoutWidth = pw - 40
+        s.position = CGPoint(x: 0, y: ph / 2 - 102)
+        s.zPosition = 2
         o.addChild(s)
-        let stats = makeLabel("Foes slain: \(runData.kills)    Soul Shards earned: \(runData.souls)    Total: \(Meta.shared.data.souls)",
+        let stats = makeLabel("Foes slain \(runData.kills)   ·   Soul Shards earned \(runData.souls)   ·   Total \(Meta.shared.data.souls)",
                               size: 14, color: UIColor(hex: 0xb79cff), font: Font.bold)
-        stats.position = CGPoint(x: 0, y: 0)
+        stats.position = CGPoint(x: 0, y: ph / 2 - 136)
+        stats.zPosition = 2
         o.addChild(stats)
-        let tip = makeLabel("Spend Soul Shards at the Altar of Embers to grow stronger.", size: 12,
-                            color: UIColor(white: 0.6, alpha: 1), font: Font.medium)
-        tip.position = CGPoint(x: 0, y: -28)
+        let tip = makeLabel("Spend Soul Shards at the Altar of Embers to grow stronger.", size: 13,
+                            color: Ink.boneDark, font: Font.medium)
+        tip.position = CGPoint(x: 0, y: ph / 2 - 160)
+        tip.zPosition = 2
         o.addChild(tip)
-        let b = Button("Return to the Sanctum", size: CGSize(width: 260, height: 48), fontSize: 18) { [weak self] in
+        let b = Button("Return to the Sanctum", size: CGSize(width: 270, height: 48), fontSize: 17) { [weak self] in
             self?.goToSanctum()
         }
         b.priority = 10
-        b.position = CGPoint(x: 0, y: -H * 0.28)
+        b.zPosition = 3
+        b.position = CGPoint(x: 0, y: -ph / 2 + 44)
         o.addChild(b)
         o.alpha = 0
         o.run(.fadeIn(withDuration: 0.5))

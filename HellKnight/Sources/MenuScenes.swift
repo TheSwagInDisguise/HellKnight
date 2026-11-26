@@ -58,17 +58,17 @@ final class TitleScene: BaseScene {
         halo.alpha = 0.45
         halo.position = CGPoint(x: 0, y: H * 0.17)
         addChild(halo)
+        // Summoning circle on the "floor" under the knight (flattened, spinning inside).
+        let floorNode = SKNode()
+        floorNode.position = CGPoint(x: 0, y: H * 0.17 - 62)
+        floorNode.yScale = 0.42
+        addChild(floorNode)
         let sig = SKSpriteNode(texture: Tex.sigil(), size: CGSize(width: 300, height: 300))
         sig.color = Ink.blood
         sig.colorBlendFactor = 1
-        sig.alpha = 0.3
-        sig.position = CGPoint(x: 0, y: H * 0.17)
-        sig.yScale = 0.45
-        sig.position.y -= 60
-        addChild(sig)
-        let spin = SKNode()
+        sig.alpha = 0.35
+        floorNode.addChild(sig)
         sig.run(.repeatForever(.rotate(byAngle: .pi * 2, duration: 40)))
-        _ = spin
         let knight = SKSpriteNode(texture: Tex.knight(), size: CGSize(width: 110, height: 144))
         knight.position = CGPoint(x: 0, y: H * 0.17)
         knight.zPosition = 1

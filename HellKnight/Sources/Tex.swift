@@ -62,14 +62,16 @@ enum Tex {
     /// Filled shape with a heavy ink outline.
     static func ink(_ c: CGContext, _ path: CGPath, _ col: UIColor, lw: CGFloat = 2.2) {
         fill(c, path, col)
+        sheen(c, path, light: 0.3, dark: 0.4)
         stroke(c, path, Ink.black, lw)
     }
 
     /// Black silhouette with an engraved bone hairline inside the outline.
-    static func shade(_ c: CGContext, _ path: CGPath, _ col: UIColor = Ink.black, rim: UIColor = Ink.boneDark) {
+    static func shade(_ c: CGContext, _ path: CGPath, _ col: UIColor = UIColor(hex: 0x1d1816), rim: UIColor = UIColor(hex: 0xffb27a)) {
         fill(c, path, col)
-        stroke(c, path, Ink.black, 2.6)
-        stroke(c, path, rim.withAlphaComponent(0.85), 0.9)
+        sheen(c, path, light: 0.16, dark: 0.55)
+        rimLight(c, path, rim.withAlphaComponent(0.85), width: 2)
+        stroke(c, path, Ink.black, 2.2)
     }
 
     /// Engraving-style parallel hatching clipped to a path (and optional region).
@@ -237,189 +239,190 @@ enum Tex {
         }
     }
 
-    /// Screen overlay: darkened edges with engraving cross-hatching.
+    /// Soft cinematic vignette.
     static func inkVignette() -> SKTexture {
-        make("inkvignette", 384, 256) { c in
-            let cols = [UIColor(white: 0, alpha: 0).cgColor, UIColor(white: 0, alpha: 0.85).cgColor] as CFArray
-            if let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: cols, locations: [0.5, 1]) {
-                c.saveGState()
-                c.scaleBy(x: 1.5, y: 1)
-                let p = CGPoint(x: 128, y: 128)
-                c.drawRadialGradient(g, startCenter: p, startRadius: 0, endCenter: p, endRadius: 172, options: [.drawsAfterEndLocation])
-                c.restoreGState()
-            }
-            c.setLineWidth(0.8)
-            for dir in [CGFloat(1), CGFloat(-1)] {
-                var x: CGFloat = -260
-                while x < 640 {
-                    var t: CGFloat = 0
-                    while t < 1 {
-                        let x0 = x + t * 256 * dir, y0 = t * 256
-                        let x1 = x + (t + 0.04) * 256 * dir, y1 = (t + 0.04) * 256
-                        let mx = (x0 + x1) / 2 / 384 - 0.5, my = (y0 + y1) / 2 / 256 - 0.5
-                        let d = sqrt(mx * mx + my * my) * 2
-                        let a = clamp((d - 0.62) / 0.38, 0, 1) * 0.55
-                        if a > 0.01 {
-                            c.setStrokeColor(UIColor(white: 0, alpha: a).cgColor)
-                            c.beginPath()
-                            c.move(to: CGPoint(x: x0, y: y0))
-                            c.addLine(to: CGPoint(x: x1, y: y1))
-                            c.strokePath()
-                        }
-                        t += 0.04
-                    }
-                    x += 5
-                }
-            }
-        }
-    }
-
-    // MARK: - UI (ornate gothic)
-
-    /// Ornate framed panel. `accent` tints the inner filigree line.
-    static func panel(_ w: CGFloat, _ h: CGFloat, accent: UIColor = Ink.gold, fillAlpha: CGFloat = 0.95) -> SKTexture {
-        let W = max(24, w.rounded()), H = max(20, h.rounded())
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        accent.getRed(&r, green: &g, blue: &b, alpha: &a)
-        let key = "panel_\(Int(W))x\(Int(H))_\(Int(r * 255))_\(Int(g * 255))_\(Int(b * 255))_\(Int(fillAlpha * 100))"
-        return make(key, W, H) { c in
-            let cut: CGFloat = min(8, H * 0.22)
-            func chamfer(_ i: CGFloat) -> CGPath {
-                P([(i + cut, i), (W - i - cut, i), (W - i, i + cut), (W - i, H - i - cut), (W - i - cut, H - i),
-                   (i + cut, H - i), (i, H - i - cut), (i, i + cut)])
-            }
-            let outer = chamfer(1.5)
-            fill(c, outer, Ink.panel.withAlphaComponent(fillAlpha))
+        make("vignette2", 384, 256) { c in
+            let cols = [UIColor(white: 0, alpha: 0).cgColor, UIColor(white: 0, alpha: 0.25).cgColor, UIColor(white: 0, alpha: 0.85).cgColor] as CFArray
+            guard let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: cols, locations: [0.45, 0.75, 1]) else { return }
             c.saveGState()
-            c.addPath(outer)
-            c.clip()
-            radial(c, W / 2, H * 0.35, max(W, H) * 0.7, [UIColor(white: 1, alpha: 0.06), UIColor(white: 1, alpha: 0)], [0, 1])
+            c.scaleBy(x: 1.5, y: 1)
+            let p = CGPoint(x: 128, y: 128)
+            c.drawRadialGradient(g, startCenter: p, startRadius: 0, endCenter: p, endRadius: 172, options: [.drawsAfterEndLocation])
             c.restoreGState()
-            stroke(c, outer, Ink.goldDark, 3)
-            stroke(c, outer, Ink.gold, 1.4)
-            if W > 50 && H > 30 {
-                stroke(c, chamfer(5), accent.withAlphaComponent(0.55), 0.8)
-            }
-            // corner studs
-            for (x, y) in [(cut * 0.75 + 1, cut * 0.75 + 1), (W - cut * 0.75 - 1, cut * 0.75 + 1),
-                           (cut * 0.75 + 1, H - cut * 0.75 - 1), (W - cut * 0.75 - 1, H - cut * 0.75 - 1)] {
-                fill(c, P([(x, y - 2.6), (x + 2.6, y), (x, y + 2.6), (x - 2.6, y)]), Ink.gold)
-            }
-            if W > 90 {
-                let m = W / 2
-                fill(c, P([(m, -0.5), (m + 5, 3.5), (m, 7.5), (m - 5, 3.5)]), Ink.gold)
-                stroke(c, P([(m, -0.5), (m + 5, 3.5), (m, 7.5), (m - 5, 3.5)]), Ink.goldDark, 1)
-                fill(c, P([(m, H + 0.5), (m + 5, H - 3.5), (m, H - 7.5), (m - 5, H - 3.5)]), Ink.gold)
+        }
+    }
+
+    /// Soft cloud of fog (white; tint it).
+    static func fog() -> SKTexture {
+        make("fog", 256, 160) { c in
+            var rng = SeededRNG(seed: 4242)
+            for _ in 0..<26 {
+                let x = CGFloat.random(in: 50...206, using: &rng)
+                let y = CGFloat.random(in: 45...115, using: &rng)
+                let r = CGFloat.random(in: 25...55, using: &rng)
+                radial(c, x, y, r, [UIColor(white: 1, alpha: 0.16), UIColor(white: 1, alpha: 0)], [0, 1])
             }
         }
     }
 
-    /// Tarot-style boon card with a pointed arch top.
+    /// Fills a path with a diagonal light→shadow gradient (form shading).
+    static func sheen(_ c: CGContext, _ path: CGPath, light: CGFloat = 0.35, dark: CGFloat = 0.45) {
+        let b = path.boundingBox
+        linear(c, path, UIColor(white: 1, alpha: light), UIColor(white: 0, alpha: dark),
+               from: CGPoint(x: b.minX, y: b.minY), to: CGPoint(x: b.maxX, y: b.maxY))
+    }
+
+    /// Colored rim light along the upper-left edge of a shape.
+    static func rimLight(_ c: CGContext, _ path: CGPath, _ col: UIColor, width: CGFloat = 2.2) {
+        let b = path.boundingBox
+        c.saveGState()
+        c.addPath(path)
+        c.setLineWidth(width * 2)
+        c.replacePathWithStrokedPath()
+        c.clip()
+        c.addPath(path)
+        c.clip()
+        let cols = [col.cgColor, col.withAlphaComponent(0).cgColor] as CFArray
+        if let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: cols, locations: [0, 0.6]) {
+            c.drawLinearGradient(g, start: CGPoint(x: b.minX, y: b.minY), end: CGPoint(x: b.maxX, y: b.maxY), options: [])
+        }
+        c.restoreGState()
+    }
+
+    // MARK: - UI (clean, modern)
+
+    private static func colorKey(_ c: UIColor?) -> String {
+        guard let c = c else { return "n" }
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        c.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return "\(Int(r * 255))_\(Int(g * 255))_\(Int(b * 255))"
+    }
+
+    static func linear(_ c: CGContext, _ path: CGPath, _ top: UIColor, _ bottom: UIColor, from p0: CGPoint, to p1: CGPoint) {
+        let cols = [top.cgColor, bottom.cgColor] as CFArray
+        guard let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: cols, locations: [0, 1]) else { return }
+        c.saveGState()
+        c.addPath(path)
+        c.clip()
+        c.drawLinearGradient(g, start: p0, end: p1, options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+        c.restoreGState()
+    }
+
+    /// Sleek translucent panel. `accent` = nil for neutral, a color for a tinted primary panel.
+    static func panel(_ w: CGFloat, _ h: CGFloat, accent: UIColor? = nil, fillAlpha: CGFloat = 0.88) -> SKTexture {
+        let W = max(16, w.rounded()), H = max(16, h.rounded())
+        let key = "panel2_\(Int(W))x\(Int(H))_\(colorKey(accent))_\(Int(fillAlpha * 100))"
+        return make(key, W + 8, H + 8) { c in
+            let r = min(12, H / 2.6)
+            let shape = Rr(4, 4, W, H, r)
+            c.saveGState()
+            c.setShadow(offset: CGSize(width: 0, height: 2), blur: 4, color: UIColor(white: 0, alpha: 0.6 * fillAlpha).cgColor)
+            fill(c, shape, UIColor(white: 0, alpha: fillAlpha * 0.9))
+            c.restoreGState()
+            if let a = accent {
+                linear(c, shape, a.scaled(0.62).withAlphaComponent(fillAlpha), a.scaled(0.32).withAlphaComponent(fillAlpha),
+                       from: CGPoint(x: 0, y: 4), to: CGPoint(x: 0, y: H + 4))
+                stroke(c, Rr(4.5, 4.5, W - 1, H - 1, r), a.scaled(1.2).withAlphaComponent(0.55), 1)
+            } else {
+                linear(c, shape, UIColor(hex: 0x1d1917, alpha: fillAlpha), UIColor(hex: 0x0d0b0a, alpha: fillAlpha),
+                       from: CGPoint(x: 0, y: 4), to: CGPoint(x: 0, y: H + 4))
+                stroke(c, Rr(4.5, 4.5, W - 1, H - 1, r), UIColor(white: 1, alpha: 0.12), 1)
+            }
+            line(c, [CGPoint(x: 4 + r, y: 5.5), CGPoint(x: W + 4 - r, y: 5.5)], UIColor(white: 1, alpha: 0.1), 1)
+        }
+    }
+
+    /// Boon card: dark glass card with a glowing colored header.
     static func card(_ w: CGFloat, _ h: CGFloat, accent: UIColor) -> SKTexture {
         let W = w.rounded(), H = h.rounded()
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        accent.getRed(&r, green: &g, blue: &b, alpha: &a)
-        let key = "card_\(Int(W))x\(Int(H))_\(Int(r * 255))_\(Int(g * 255))_\(Int(b * 255))"
-        return make(key, W, H) { c in
-            let outer = gothicArch(2, H - 2, W - 4, H - 4)
-            fill(c, outer, UIColor(hex: 0x17100d))
+        return make("card2_\(Int(W))x\(Int(H))_\(colorKey(accent))", W + 10, H + 10) { c in
+            let shape = Rr(5, 5, W, H, 14)
             c.saveGState()
-            c.addPath(outer)
-            c.clip()
-            radial(c, W / 2, 52, W * 0.9, [accent.withAlphaComponent(0.22), accent.withAlphaComponent(0)], [0, 1])
-            hatch(c, outer, region: CGRect(x: 0, y: H - 46, width: W, height: 46), spacing: 4, angle: 0.6,
-                  color: Ink.gold.withAlphaComponent(0.12), lw: 0.8)
+            c.setShadow(offset: CGSize(width: 0, height: 4), blur: 6, color: UIColor(white: 0, alpha: 0.7).cgColor)
+            fill(c, shape, UIColor(hex: 0x0e0b0a))
             c.restoreGState()
-            stroke(c, outer, Ink.goldDark, 4)
-            stroke(c, outer, Ink.gold, 1.6)
-            let inner = gothicArch(8, H - 8, W - 16, H - 16)
-            stroke(c, inner, accent.withAlphaComponent(0.8), 1)
-            // medallion socket
-            circle(c, W / 2, 34, 23, Ink.black)
-            ring(c, W / 2, 34, 23, Ink.gold, 2)
-            ring(c, W / 2, 34, 19, accent.withAlphaComponent(0.7), 1)
-            // divider
-            line(c, [CGPoint(x: 18, y: 112), CGPoint(x: W / 2 - 8, y: 112)], Ink.gold.withAlphaComponent(0.7), 1)
-            line(c, [CGPoint(x: W / 2 + 8, y: 112), CGPoint(x: W - 18, y: 112)], Ink.gold.withAlphaComponent(0.7), 1)
-            fill(c, P([(W / 2, 107), (W / 2 + 5, 112), (W / 2, 117), (W / 2 - 5, 112)]), accent)
-            // feet
-            for x in [CGFloat(14), W - 14] {
-                fill(c, P([(x, H - 18), (x + 5, H - 13), (x, H - 8), (x - 5, H - 13)]), Ink.gold)
+            linear(c, shape, UIColor(hex: 0x1c1715), UIColor(hex: 0x0b0908), from: CGPoint(x: 0, y: 5), to: CGPoint(x: 0, y: H + 5))
+            c.saveGState()
+            c.addPath(shape)
+            c.clip()
+            radial(c, W / 2 + 5, 40, W * 0.85, [accent.withAlphaComponent(0.42), accent.withAlphaComponent(0)], [0, 1])
+            rect(c, 5, 5, W, 3, accent)
+            c.restoreGState()
+            stroke(c, Rr(5.5, 5.5, W - 1, H - 1, 14), accent.withAlphaComponent(0.55), 1.2)
+            circle(c, W / 2 + 5, 41, 24, UIColor(white: 0, alpha: 0.55))
+            ring(c, W / 2 + 5, 41, 24, accent.withAlphaComponent(0.7), 1.2)
+            let lx0 = CGFloat(24), lx1 = W - 14
+            linear(c, Rr(lx0, 114, lx1 - lx0, 1), accent.withAlphaComponent(0), accent.withAlphaComponent(0),
+                   from: CGPoint(x: lx0, y: 0), to: CGPoint(x: lx1, y: 0))
+            let lineGrad = [accent.withAlphaComponent(0).cgColor, accent.withAlphaComponent(0.6).cgColor, accent.withAlphaComponent(0).cgColor] as CFArray
+            if let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: lineGrad, locations: [0, 0.5, 1]) {
+                c.saveGState()
+                c.clip(to: CGRect(x: lx0, y: 114, width: lx1 - lx0, height: 1))
+                c.drawLinearGradient(g, start: CGPoint(x: lx0, y: 0), end: CGPoint(x: lx1, y: 0), options: [])
+                c.restoreGState()
             }
         }
     }
 
     static func barFrame(_ w: CGFloat, _ h: CGFloat) -> SKTexture {
         let W = w.rounded(), H = h.rounded()
-        return make("bar_\(Int(W))x\(Int(H))", W + 24, H + 8) { c in
-            let p = P([(2, (H + 8) / 2), (12, 2), (W + 12, 2), (W + 22, (H + 8) / 2), (W + 12, H + 6), (12, H + 6)])
-            fill(c, p, UIColor(hex: 0x0a0706, alpha: 0.92))
-            stroke(c, p, Ink.goldDark, 3.5)
-            stroke(c, p, Ink.gold, 1.4)
+        return make("bar2_\(Int(W))x\(Int(H))", W + 24, H + 8) { c in
+            let p = Rr(9, 1, W + 6, H + 6, (H + 6) / 2)
+            c.saveGState()
+            c.setShadow(offset: CGSize(width: 0, height: 1), blur: 3, color: UIColor(white: 0, alpha: 0.7).cgColor)
+            fill(c, p, UIColor(white: 0, alpha: 0.65))
+            c.restoreGState()
+            stroke(c, p, UIColor(white: 1, alpha: 0.16), 1)
         }
     }
 
+    /// Round charge pip.
     static func gem(_ hex: UInt32) -> SKTexture {
         let col = UIColor(hex: hex)
-        return make("gem\(hex)", 16, 18) { c in
-            let p = P([(8, 1), (15, 7), (8, 17), (1, 7)])
-            fill(c, p, col)
-            fill(c, P([(8, 1), (11, 7), (8, 17), (5, 7)]), col.scaled(1.35))
-            stroke(c, p, Ink.black, 1.6)
-            stroke(c, p, Ink.gold.withAlphaComponent(0.7), 0.6)
+        return make("pip\(hex)", 16, 16) { c in
+            radial(c, 8, 8, 8, [col.withAlphaComponent(0.6), col.withAlphaComponent(0)], [0.4, 1])
+            radial(c, 7, 7, 5.5, [col.scaled(1.4), col.scaled(0.75)], [0, 1])
+            ring(c, 8, 8, 5, UIColor(white: 0, alpha: 0.6), 1)
         }
     }
 
+    /// Hairline divider fading out at both ends.
     static func divider(_ w: CGFloat) -> SKTexture {
         let W = w.rounded()
-        return make("divider\(Int(W))", W, 14) { c in
-            line(c, [CGPoint(x: 0, y: 7), CGPoint(x: W / 2 - 12, y: 7)], Ink.gold.withAlphaComponent(0.8), 1.2)
-            line(c, [CGPoint(x: W / 2 + 12, y: 7), CGPoint(x: W, y: 7)], Ink.gold.withAlphaComponent(0.8), 1.2)
-            let d = P([(W / 2, 1), (W / 2 + 7, 7), (W / 2, 13), (W / 2 - 7, 7)])
-            fill(c, d, Ink.blood)
-            stroke(c, d, Ink.gold, 1.2)
-            circle(c, W / 2 - 16, 7, 2, Ink.gold)
-            circle(c, W / 2 + 16, 7, 2, Ink.gold)
+        return make("div2_\(Int(W))", W, 6) { c in
+            let cols = [UIColor(white: 1, alpha: 0).cgColor, UIColor(white: 1, alpha: 0.55).cgColor, UIColor(white: 1, alpha: 0).cgColor] as CFArray
+            if let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: cols, locations: [0, 0.5, 1]) {
+                c.saveGState()
+                c.clip(to: CGRect(x: 0, y: 2.5, width: W, height: 1))
+                c.drawLinearGradient(g, start: .zero, end: CGPoint(x: W, y: 0), options: [])
+                c.restoreGState()
+            }
+            circle(c, W / 2, 3, 2.2, Ink.blood.scaled(1.3))
         }
     }
 
-    static func medallion(_ r: CGFloat, accent: UIColor = Ink.gold) -> SKTexture {
+    /// Round touch button.
+    static func medallion(_ r: CGFloat, accent: UIColor = UIColor(white: 1, alpha: 1)) -> SKTexture {
         let R = r.rounded()
-        var cr: CGFloat = 0, cg: CGFloat = 0, cb: CGFloat = 0, ca: CGFloat = 0
-        accent.getRed(&cr, green: &cg, blue: &cb, alpha: &ca)
-        return make("medal\(Int(R))_\(Int(cr * 255))_\(Int(cg * 255))", R * 2 + 4, R * 2 + 4) { c in
+        return make("btn2_\(Int(R))_\(colorKey(accent))", R * 2 + 4, R * 2 + 4) { c in
             let m = R + 2
-            radial(c, m, m, R, [UIColor(hex: 0x241814, alpha: 0.92), UIColor(hex: 0x0b0706, alpha: 0.92)], [0, 1])
-            ring(c, m, m, R - 1.5, Ink.goldDark, 3.5)
-            ring(c, m, m, R - 1.5, Ink.gold, 1.4)
-            ring(c, m, m, R - 6, accent.withAlphaComponent(0.6), 0.8)
-            for i in 0..<8 {
-                let a = CGFloat(i) * .pi / 4 + .pi / 8
-                circle(c, m + cos(a) * (R - 1.5), m + sin(a) * (R - 1.5), 1.8, Ink.gold)
-            }
+            radial(c, m, m, R, [UIColor(white: 0.12, alpha: 0.55), UIColor(white: 0.02, alpha: 0.7)], [0, 1])
+            ring(c, m, m, R - 1, accent.withAlphaComponent(0.5), 1.5)
+            ring(c, m, m, R - 4, UIColor(white: 1, alpha: 0.06), 1)
         }
     }
 
     static func joyBase() -> SKTexture {
-        make("joybase", 136, 136) { c in
-            circle(c, 68, 68, 60, UIColor(white: 0, alpha: 0.25))
-            ring(c, 68, 68, 60, Ink.goldDark, 3)
-            ring(c, 68, 68, 60, Ink.gold.withAlphaComponent(0.8), 1.2)
-            ring(c, 68, 68, 50, Ink.bone.withAlphaComponent(0.25), 0.8)
-            for i in 0..<4 {
-                let a = CGFloat(i) * .pi / 2
-                let x = 68 + cos(a) * 60, y = 68 + sin(a) * 60
-                fill(c, P([(x, y - 5), (x + 5, y), (x, y + 5), (x - 5, y)]), Ink.gold)
-            }
+        make("joybase2", 136, 136) { c in
+            radial(c, 68, 68, 60, [UIColor(white: 0, alpha: 0.05), UIColor(white: 0, alpha: 0.35)], [0, 1])
+            ring(c, 68, 68, 59, UIColor(white: 1, alpha: 0.28), 1.5)
         }
     }
 
     static func joyKnob() -> SKTexture {
-        make("joyknob", 60, 60) { c in
-            radial(c, 30, 30, 26, [UIColor(hex: 0x3a2a22), UIColor(hex: 0x120c0a)], [0, 1])
-            ring(c, 30, 30, 26, Ink.gold, 2)
-            fill(c, P([(30, 20), (40, 30), (30, 40), (20, 30)]), Ink.blood)
-            stroke(c, P([(30, 20), (40, 30), (30, 40), (20, 30)]), Ink.gold, 1)
+        make("joyknob2", 60, 60) { c in
+            radial(c, 28, 27, 26, [UIColor(white: 0.95, alpha: 0.55), UIColor(white: 0.7, alpha: 0.3)], [0, 1])
+            ring(c, 30, 30, 25, UIColor(white: 1, alpha: 0.6), 1.5)
         }
     }
 
@@ -455,6 +458,7 @@ enum Tex {
             let torso = P([(20, 32), (44, 32), (42, 52), (38, 62), (26, 62), (22, 52)])
             ink(c, torso, Ink.bone, lw: 2.4)
             shadeRight(c, torso, 0.4)
+            rimLight(c, torso, UIColor(white: 1, alpha: 0.9), width: 1.6)
             line(c, [CGPoint(x: 32, y: 34), CGPoint(x: 32, y: 60)], Ink.black, 1)
             line(c, [CGPoint(x: 23, y: 44), CGPoint(x: 41, y: 44)], Ink.black.withAlphaComponent(0.5), 0.8)
             ink(c, Rr(22, 54, 20, 4), Ink.steel, lw: 1.2)
@@ -468,6 +472,7 @@ enum Tex {
             let helm = E(32, 21, 10, 11)
             ink(c, helm, Ink.bone, lw: 2.4)
             shadeRight(c, helm, 0.38, spacing: 2.4)
+            rimLight(c, helm, UIColor(white: 1, alpha: 0.95), width: 1.6)
             rect(c, 23.5, 20, 17, 3.5, Ink.black)
             rect(c, 30.5, 20, 3, 9, Ink.black)
             glowDot(c, 27, 21.7, 3.4, Ink.blood)
@@ -850,6 +855,26 @@ enum Tex {
             c.restoreGState()
             stroke(c, arch, Ink.black, 3)
             stroke(c, arch, pal.line.withAlphaComponent(0.5), 1)
+        } else if v == 3 {
+            let bw: CGFloat = 36
+            let bx = w / 2 - bw / 2
+            let cloth = P([(bx, 24), (bx + bw, 24), (bx + bw, H - 46), (bx + bw / 2, H - 60), (bx, H - 46)])
+            c.saveGState()
+            c.setShadow(offset: CGSize(width: 3, height: 3), blur: 4, color: UIColor(white: 0, alpha: 0.6).cgColor)
+            fill(c, cloth, UIColor(hex: 0x6e0f14))
+            c.restoreGState()
+            linear(c, cloth, UIColor(hex: 0x9c1a20), UIColor(hex: 0x3c070a), from: CGPoint(x: bx, y: 24), to: CGPoint(x: bx + bw, y: H - 50))
+            for k in 0..<3 {
+                let fx = bx + 8 + CGFloat(k) * 10
+                line(c, [CGPoint(x: fx, y: 30), CGPoint(x: fx + 1, y: H - 56)], UIColor(white: 0, alpha: 0.25), 2)
+            }
+            stroke(c, cloth, Ink.black, 1.6)
+            stroke(c, P([(bx + 3, 27), (bx + bw - 3, 27), (bx + bw - 3, H - 48), (bx + bw / 2, H - 61), (bx + 3, H - 48)]), Ink.gold.withAlphaComponent(0.7), 1)
+            let em = E(w / 2, 62, 9, 10)
+            ink(c, em, Ink.bone, lw: 1.4)
+            fill(c, E(w / 2 - 3.2, 62, 2, 2.4), Ink.black)
+            fill(c, E(w / 2 + 3.2, 62, 2, 2.4), Ink.black)
+            ink(c, Rr(bx - 4, 20, bw + 8, 4, 2), Ink.gold, lw: 1)
         } else if v == 2 {
             let niche = gothicArch(w / 2 - 12, H - 40, 24, 46)
             fill(c, niche, Ink.black)
@@ -967,6 +992,117 @@ enum Tex {
             hatch(c, col, region: CGRect(x: 34, y: 14, width: 14, height: 32), spacing: 2.4)
             ink(c, E(32, 14, 22, 7), pal.stone.scaled(1.2))
             ring(c, 32, 14, 14, pal.accent.withAlphaComponent(0.5), 1)
+        }
+    }
+
+    // MARK: - Props
+
+    static func brazier() -> SKTexture {
+        make("brazier", 56, 72) { c in
+            for (x0, x1) in [(CGFloat(14), CGFloat(8)), (42, 48), (28, 28)] {
+                line(c, [CGPoint(x: x0, y: 40), CGPoint(x: x1, y: 70)], Ink.black, 4)
+                line(c, [CGPoint(x: x0, y: 40), CGPoint(x: x1, y: 70)], UIColor(hex: 0x4a423c), 1.6)
+            }
+            let bowl = P([(4, 26), (52, 26), (44, 42), (12, 42)])
+            ink(c, bowl, UIColor(hex: 0x3a332e), lw: 2)
+            hatch(c, bowl, region: CGRect(x: 30, y: 24, width: 24, height: 20), spacing: 2.4)
+            fill(c, E(28, 26, 22, 5), UIColor(hex: 0x1a0a05))
+            for (x, y) in [(CGFloat(18), CGFloat(25)), (26, 23), (34, 25), (40, 24), (22, 27)] {
+                radial(c, x, y, 5, [UIColor(hex: 0xffd27a), UIColor(hex: 0xff5a10, alpha: 0)], [0, 1])
+            }
+            stroke(c, E(28, 26, 22, 5), Ink.black, 1.6)
+        }
+    }
+
+    static func flame() -> SKTexture {
+        make("flame", 32, 48) { c in
+            let p = CGMutablePath()
+            p.move(to: CGPoint(x: 16, y: 1))
+            p.addCurve(to: CGPoint(x: 28, y: 34), control1: CGPoint(x: 20, y: 14), control2: CGPoint(x: 30, y: 22))
+            p.addCurve(to: CGPoint(x: 16, y: 47), control1: CGPoint(x: 27, y: 43), control2: CGPoint(x: 22, y: 47))
+            p.addCurve(to: CGPoint(x: 4, y: 34), control1: CGPoint(x: 10, y: 47), control2: CGPoint(x: 5, y: 43))
+            p.addCurve(to: CGPoint(x: 16, y: 1), control1: CGPoint(x: 2, y: 22), control2: CGPoint(x: 12, y: 14))
+            linear(c, p, UIColor(hex: 0xfff2c0), UIColor(hex: 0xff4a10, alpha: 0.6), from: CGPoint(x: 16, y: 47), to: CGPoint(x: 16, y: 2))
+            radial(c, 16, 36, 9, [UIColor(white: 1, alpha: 0.95), UIColor(white: 1, alpha: 0)], [0, 1])
+        }
+    }
+
+    static func candles() -> SKTexture {
+        make("candles", 60, 52) { c in
+            fill(c, E(30, 46, 26, 6), UIColor(hex: 0xd8ceb4, alpha: 0.5))
+            let specs: [(CGFloat, CGFloat, CGFloat)] = [(12, 22, 6), (24, 10, 7), (36, 18, 6.5), (47, 28, 5.5), (30, 30, 5)]
+            for (x, top, w) in specs {
+                let body = Rr(x - w / 2, top, w, 48 - top, 2)
+                ink(c, body, UIColor(hex: 0xe9dfc6), lw: 1.4)
+                fill(c, E(x, top + 1, w / 2 + 0.5, 1.6), UIColor(hex: 0xfff8e4))
+                fill(c, P([(x - w / 2, top + 2), (x - w / 2 + 1.5, top + 9), (x - w / 2 + 2.5, top + 2)]), UIColor(hex: 0xfff8e4))
+                line(c, [CGPoint(x: x, y: top), CGPoint(x: x, y: top - 3)], Ink.black, 1)
+            }
+        }
+    }
+
+    static func bones() -> SKTexture {
+        make("bones", 76, 44) { c in
+            var rng = SeededRNG(seed: 17)
+            for _ in 0..<7 {
+                let x = CGFloat.random(in: 10...60, using: &rng), y = CGFloat.random(in: 22...38, using: &rng)
+                let a = CGFloat.random(in: -0.6...0.6, using: &rng)
+                let dx = cos(a) * 11, dy = sin(a) * 11
+                line(c, [CGPoint(x: x - dx, y: y - dy), CGPoint(x: x + dx, y: y + dy)], Ink.black, 5)
+                line(c, [CGPoint(x: x - dx, y: y - dy), CGPoint(x: x + dx, y: y + dy)], Ink.bone, 2.8)
+                circle(c, x - dx, y - dy, 2.6, Ink.bone)
+                circle(c, x + dx, y + dy, 2.6, Ink.bone)
+            }
+            let sk = E(38, 18, 10, 9.5)
+            ink(c, sk, Ink.bone, lw: 1.8)
+            hatch(c, sk, region: CGRect(x: 40, y: 8, width: 10, height: 20), spacing: 2.2)
+            fill(c, E(34.5, 18, 2.6, 3), Ink.black)
+            fill(c, E(41.5, 18, 2.6, 3), Ink.black)
+            ink(c, Rr(33, 24, 10, 5), Ink.bone, lw: 1.2)
+        }
+    }
+
+    static func rubble(_ depth: Int) -> SKTexture {
+        let pal = Palette.of(depth)
+        return make("rubble\(depth)", 70, 40) { c in
+            var rng = SeededRNG(seed: UInt64(depth + 300))
+            for _ in 0..<6 {
+                let x = CGFloat.random(in: 12...58, using: &rng), y = CGFloat.random(in: 16...32, using: &rng)
+                let r = CGFloat.random(in: 5...11, using: &rng)
+                let rock = P([(x - r, y + r * 0.4), (x - r * 0.5, y - r * 0.7), (x + r * 0.6, y - r * 0.6), (x + r, y + r * 0.3), (x + r * 0.2, y + r * 0.7)])
+                ink(c, rock, pal.stone.scaled(CGFloat.random(in: 0.8...1.2, using: &rng)), lw: 1.4)
+            }
+        }
+    }
+
+    /// Ground-plane lava grate.
+    static func grate(_ depth: Int) -> SKTexture {
+        let pal = Palette.of(depth)
+        return make("grate\(depth)", 96, 96) { c in
+            rect(c, 4, 4, 88, 88, Ink.black)
+            radial(c, 48, 48, 46, [pal.accent, pal.accent.withAlphaComponent(0.2)], [0, 1])
+            for i in 0..<7 {
+                let x = 8 + CGFloat(i) * 13
+                rect(c, x, 4, 5, 88, UIColor(hex: 0x2a2420))
+                rect(c, x, 4, 1.5, 88, UIColor(white: 1, alpha: 0.12))
+            }
+            stroke(c, Rr(3, 3, 90, 90), UIColor(hex: 0x3a322c), 5)
+            stroke(c, Rr(1, 1, 94, 94), Ink.black, 2)
+        }
+    }
+
+    /// Ground-plane carpet runner (tiles along its length).
+    static func carpet() -> SKTexture {
+        make("carpet", 96, 128) { c in
+            linear(c, Rr(0, 0, 96, 128), UIColor(hex: 0x5a0d12), UIColor(hex: 0x3a070b), from: CGPoint(x: 0, y: 0), to: CGPoint(x: 96, y: 0))
+            rect(c, 6, 0, 5, 128, Ink.gold.withAlphaComponent(0.55))
+            rect(c, 85, 0, 5, 128, Ink.gold.withAlphaComponent(0.55))
+            rect(c, 14, 0, 1.5, 128, Ink.gold.withAlphaComponent(0.35))
+            rect(c, 80.5, 0, 1.5, 128, Ink.gold.withAlphaComponent(0.35))
+            let d = P([(48, 34), (64, 64), (48, 94), (32, 64)])
+            stroke(c, d, Ink.gold.withAlphaComponent(0.45), 2)
+            fill(c, E(48, 64, 5, 5), Ink.gold.withAlphaComponent(0.4))
+            hatch(c, Rr(0, 0, 96, 128), spacing: 3, angle: 1.57, color: UIColor(white: 0, alpha: 0.15), lw: 0.7)
         }
     }
 

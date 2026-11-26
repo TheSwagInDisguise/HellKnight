@@ -31,6 +31,9 @@ class Enemy: SKNode {
     var timer: CGFloat = 0
     var showsBar = true
     var deathColor = UIColor(hex: 0xff5030)
+    var light: SKSpriteNode?
+    var bobPhase = CGFloat.random(in: 0...6)
+    var spriteScale: CGFloat = 1
 
     let up = Billboard()
     let sprite: SKSpriteNode
@@ -92,6 +95,7 @@ class Enemy: SKNode {
         hp = maxHp
         dmgMult *= 1.25
         radius *= 1.15
+        spriteScale = 1.15
         sprite.setScale(1.15)
         statusGlow.color = UIColor(hex: 0xffc040)
         let ring = SKSpriteNode(texture: Tex.ringTex(), size: CGSize(width: radius * 2.7, height: radius * 2.7))
@@ -133,6 +137,8 @@ class Enemy: SKNode {
         } else {
             think(dt, game: game)
         }
+        bobPhase += dt * 3
+        sprite.yScale = spriteScale * (1 + sin(bobPhase) * 0.03)
         position = game.room.resolve(position, radius)
         zPosition = game.depthZ(position)
     }
@@ -169,6 +175,9 @@ class Enemy: SKNode {
             .wait(forDuration: 0.06),
             .colorize(withColorBlendFactor: 0, duration: 0.08),
         ]), withKey: "flash")
+        let tilt: CGFloat = sprite.xScale > 0 ? -0.16 : 0.16
+        sprite.removeAction(forKey: "tilt")
+        sprite.run(.sequence([.rotate(toAngle: tilt, duration: 0.04), .rotate(toAngle: 0, duration: 0.18)]), withKey: "tilt")
     }
 
     func applyBurn(dps: CGFloat, time: CGFloat) {

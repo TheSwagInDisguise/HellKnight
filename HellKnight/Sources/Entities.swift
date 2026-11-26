@@ -152,6 +152,9 @@ final class Player: SKNode {
         weaponSprite.removeAction(forKey: "thrust")
         setFacing(a)
         let sa = screenAngle(a)
+        body.removeAction(forKey: "squash")
+        body.yScale = 0.9
+        body.run(.scaleY(to: 1, duration: 0.14), withKey: "squash")
         switch weapon {
         case .blade:
             let half = arcDeg * .pi / 360
@@ -180,10 +183,13 @@ final class Player: SKNode {
         if moving {
             walkPhase += dt * 14
             body.position = CGPoint(x: 0, y: abs(sin(walkPhase)) * 3)
-            body.zRotation = sin(walkPhase) * 0.04
+            body.zRotation = sin(walkPhase) * 0.05
+            if body.action(forKey: "squash") == nil { body.yScale = 1 }
         } else {
+            walkPhase += dt * 2.6
             body.position = .zero
             body.zRotation = 0
+            if body.action(forKey: "squash") == nil { body.yScale = 1 + sin(walkPhase) * 0.022 }
         }
         if invuln > 0 && dashTime <= 0 {
             body.alpha = sin(invuln * 40) > 0 ? 0.45 : 1
@@ -214,6 +220,7 @@ final class Projectile: SKNode {
     var knock: CGFloat = 30
     var dead = false
     var tint: UIColor = .white
+    var light: SKSpriteNode?
     var hitSet = Set<ObjectIdentifier>()
     let up = Billboard()
     let art: SKSpriteNode
@@ -242,6 +249,7 @@ final class Pickup: SKNode {
     var taken = false
     var denyCD: CGFloat = 0
     let radius: CGFloat
+    var light: SKSpriteNode?
 
     var isCoin: Bool { reward == nil }
 

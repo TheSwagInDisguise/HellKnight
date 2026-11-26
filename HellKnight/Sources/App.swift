@@ -36,7 +36,7 @@ final class GameViewController: UIViewController {
         super.viewDidLayoutSubviews()
         guard let skView = view as? SKView, !presented, skView.bounds.width > 0 else { return }
         presented = true
-        let scene = TitleScene(size: skView.bounds.size)
+        let scene = ShotMode.initialScene(size: skView.bounds.size) ?? TitleScene(size: skView.bounds.size)
         scene.scaleMode = .resizeFill
         skView.presentScene(scene)
     }

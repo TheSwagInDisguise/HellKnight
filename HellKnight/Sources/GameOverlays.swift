@@ -124,15 +124,15 @@ extension GameScene {
 
     private func addHeading(_ o: SKNode, _ title: String, _ subtitle: String, color: UIColor, y: CGFloat) {
         let fs = min(28, size.width * 0.036)
-        let sh = makeLabel(title, size: fs, color: Ink.black, font: Font.title)
+        let sh = makeLabel(title.uppercased(), size: fs, color: Ink.black, font: Font.title, kern: 4)
         sh.position = CGPoint(x: 2, y: y - 2)
         sh.zPosition = 1
         o.addChild(sh)
-        let t = makeLabel(title, size: fs, color: color, font: Font.title)
+        let t = makeLabel(title.uppercased(), size: fs, color: color, font: Font.title, kern: 4)
         t.position = CGPoint(x: 0, y: y)
         t.zPosition = 1.1
         o.addChild(t)
-        let d = SKSpriteNode(texture: Tex.divider(320), size: CGSize(width: 320, height: 14))
+        let d = SKSpriteNode(texture: Tex.divider(320), size: CGSize(width: 320, height: 6))
         d.position = CGPoint(x: 0, y: y - 20)
         d.zPosition = 1
         o.addChild(d)
@@ -173,11 +173,11 @@ extension GameScene {
                 s.zPosition = 2
                 b.addChild(s)
             }
-            let tag = makeLabel(c.tag, size: 10, color: c.color, font: Font.heavy)
+            let tag = makeLabel(c.tag, size: 9, color: c.color, font: Font.bold, kern: 2.5)
             tag.position = CGPoint(x: 0, y: top - 68)
             tag.zPosition = 2
             b.addChild(tag)
-            let tl = makeLabel(c.title, size: small ? 14 : 16, color: Ink.bone, font: Font.title)
+            let tl = makeLabel(c.title, size: small ? 15 : 17, color: .white, font: Font.title)
             tl.numberOfLines = 2
             tl.preferredMaxLayoutWidth = cw - 20
             tl.position = CGPoint(x: 0, y: top - 88)
@@ -229,7 +229,7 @@ extension GameScene {
 
         let pw = min(560, W - 60)
         let ph = H - 150
-        let panel = SKSpriteNode(texture: Tex.panel(pw, ph), size: CGSize(width: pw, height: ph))
+        let panel = SKSpriteNode(texture: Tex.panel(pw, ph), size: CGSize(width: pw + 8, height: ph + 8))
         panel.position = CGPoint(x: 0, y: -8)
         panel.zPosition = 1
         o.addChild(panel)
@@ -305,16 +305,16 @@ extension GameScene {
         let o = makeOverlay()
         let pw = min(560, W - 60)
         let ph = min(300, H - 60)
-        let panel = SKSpriteNode(texture: Tex.panel(pw, ph, accent: won ? Ink.gold : Ink.blood), size: CGSize(width: pw, height: ph))
+        let panel = SKSpriteNode(texture: Tex.panel(pw, ph), size: CGSize(width: pw + 8, height: ph + 8))
         panel.zPosition = 1
         o.addChild(panel)
         let title = won ? "YOU ESCAPED THE ABYSS" : "SLAIN"
         let tcol = won ? Ink.gold : Ink.blood.scaled(1.3)
-        let t = makeLabel(title, size: won ? 28 : 44, color: tcol, font: Font.title)
+        let t = makeLabel(title, size: won ? 26 : 42, color: tcol, font: Font.title, kern: won ? 4 : 10)
         t.position = CGPoint(x: 0, y: ph / 2 - 46)
         t.zPosition = 2
         o.addChild(t)
-        let d = SKSpriteNode(texture: Tex.divider(300), size: CGSize(width: 300, height: 14))
+        let d = SKSpriteNode(texture: Tex.divider(300), size: CGSize(width: 300, height: 6))
         d.position = CGPoint(x: 0, y: ph / 2 - 76)
         d.zPosition = 2
         o.addChild(d)

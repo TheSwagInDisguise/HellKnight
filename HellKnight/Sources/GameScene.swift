@@ -30,6 +30,14 @@ final class GameScene: BaseScene {
     var doorsOpen = false
     var overlay: SKNode?
     var runRecorded = false
+    let lightLayer = SKEffectNode()
+    let lightBase = SKSpriteNode(color: .white, size: CGSize(width: 10, height: 10))
+    let fogLayer = SKNode()
+    var playerLight: SKSpriteNode?
+    var camBaseScale: CGFloat = 1
+    var zoomPunch: CGFloat = 0
+    var shot: String?
+    var shotTimer: CGFloat = 0
 
     init(size: CGSize, runData: RunState) {
         self.runData = runData
@@ -48,6 +56,7 @@ final class GameScene: BaseScene {
         addChild(isoRoot)
         topLayer.zPosition = 800
         addChild(topLayer)
+        setupLighting()
         addChild(cam)
         camera = cam
         hud.zPosition = 1000
@@ -69,9 +78,9 @@ final class GameScene: BaseScene {
     override func relayout() { layoutUI() }
 
     func layoutUI() {
-        let s = clamp(600 / max(size.height, 1), 0.75, 1.7)
-        cam.setScale(s)
-        hud.setScale(1 / s)
+        // Camera children (the HUD) are not affected by camera scale, so the HUD stays at 1:1.
+        camBaseScale = clamp(600 / max(size.height, 1), 0.75, 1.7)
+        cam.setScale(camBaseScale)
         let insets = view?.safeAreaInsets ?? .zero
         hud.layout(size, insets)
         controls.layout(size, insets)
@@ -99,6 +108,7 @@ final class GameScene: BaseScene {
         dt = min(max(dt, 0), 1.0 / 30.0)
         controls.tick(dt)
         updateCamera(dt)
+        updateLighting(dt)
         hud.refresh(runData, player, boss)
         if let p = player {
             controls.setReady(.special, p.specialCD <= 0)
@@ -111,6 +121,7 @@ final class GameScene: BaseScene {
             hitstop -= dt
             return
         }
+        if shot != nil { updateShot(dt) }
         updatePlayer(dt)
         for e in enemies {
             if state != .playing { break }
@@ -166,9 +177,19 @@ final class GameScene: BaseScene {
             shakeAmt = 0
         }
         cam.position = camBase + off
+        if zoomPunch > 0.001 {
+            zoomPunch *= max(0, 1 - dt * 9)
+            cam.setScale(camBaseScale * (1 - zoomPunch))
+        } else if zoomPunch != 0 {
+            zoomPunch = 0
+            cam.setScale(camBaseScale)
+        }
     }
 
     func addShake(_ a: CGFloat) { shakeAmt = min(16, max(shakeAmt, a)) }
+
+    /// Brief camera zoom-in for impact.
+    func punch(_ amount: CGFloat) { zoomPunch = min(0.08, max(zoomPunch, amount)) }
 
     // MARK: Run end
 

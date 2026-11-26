@@ -72,10 +72,10 @@ extension UIColor {
 }
 
 enum Font {
-    static let title = "Copperplate-Bold"
-    static let heavy = "Copperplate-Bold"
-    static let bold = "Cochin-Bold"
-    static let medium = "Cochin"
+    static let title = "Baskerville-Bold"
+    static let heavy = "AvenirNext-Heavy"
+    static let bold = "AvenirNext-DemiBold"
+    static let medium = "AvenirNext-Medium"
 }
 
 /// The ink palette shared by every area.
@@ -123,14 +123,28 @@ final class Billboard: SKNode {
 }
 
 func makeLabel(_ text: String, size: CGFloat, color: UIColor = .white, font: String = Font.bold,
-               align: SKLabelHorizontalAlignmentMode = .center) -> SKLabelNode {
+               align: SKLabelHorizontalAlignmentMode = .center, kern: CGFloat = 0) -> SKLabelNode {
     let l = SKLabelNode(fontNamed: font)
-    l.text = text
     l.fontSize = size
     l.fontColor = color
     l.horizontalAlignmentMode = align
     l.verticalAlignmentMode = .center
+    if kern > 0 {
+        setKerned(l, text, kern: kern)
+    } else {
+        l.text = text
+    }
     return l
+}
+
+/// Letter-spaced text (used for cinematic titles).
+func setKerned(_ l: SKLabelNode, _ text: String, kern: CGFloat) {
+    let font = UIFont(name: l.fontName ?? Font.title, size: l.fontSize) ?? UIFont.boldSystemFont(ofSize: l.fontSize)
+    l.attributedText = NSAttributedString(string: text, attributes: [
+        .font: font,
+        .foregroundColor: l.fontColor ?? UIColor.white,
+        .kern: kern,
+    ])
 }
 
 func visibleInTree(_ node: SKNode) -> Bool {

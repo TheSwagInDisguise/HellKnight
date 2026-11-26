@@ -119,6 +119,7 @@ extension GameScene {
         if hits > 0 {
             hitstop = finisher ? 0.07 : 0.03
             addShake(finisher ? 6 : 2.5)
+            if finisher { punch(0.035) }
             sfx(.hit, 0.8)
             if finisher { Haptics.light() }
         }
@@ -145,9 +146,11 @@ extension GameScene {
             world.addChild(s)
             s.run(.sequence([.group([.rotate(byAngle: .pi * 2, duration: 0.28), .fadeOut(withDuration: 0.3)]), .removeFromParent()]))
             let hits = arcHit(origin: p.position, angle: 0, range: range, arc: .pi * 2, damage: w.specialDamage, knock: 130, slot: .special)
+            flashLight(at: p.position, radius: 320, color: col, alpha: 0.7, duration: 0.3)
             if hits > 0 {
                 hitstop = 0.06
                 addShake(5)
+                punch(0.04)
             }
         case .hurl:
             let a = aimAngle(range: 700)
@@ -168,6 +171,8 @@ extension GameScene {
             shockwave(at: p.position, radius: range, color: col)
             burst(at: p.position, color: col, count: 22, speed: 380)
             addShake(9)
+            punch(0.05)
+            flashLight(at: p.position, radius: 380, color: col, alpha: 0.8, duration: 0.35)
             Haptics.heavy()
             let hits = arcHit(origin: p.position, angle: 0, range: range, arc: .pi * 2, damage: w.specialDamage, knock: 230, slot: .special)
             if hits > 0 { hitstop = 0.08 }
@@ -285,6 +290,7 @@ extension GameScene {
         guard e.alive else { return }
         e.takeDamage(amount)
         e.flashHit()
+        flashLight(at: e.position, radius: crit ? 260 : 170, color: crit ? Patron.umbral.color : UIColor(hex: 0xffd8b0), alpha: 0.5, duration: 0.15)
         damageNumber(amount, at: e.position, height: e.bodyHeight * 0.8, color: color, crit: crit)
         splat(at: e.position, size: crit ? 40 : 26, color: Ink.black, alpha: 0.55, fade: 1.2)
         if e.hp <= 0 {
@@ -305,6 +311,10 @@ extension GameScene {
         guard e.alive else { return }
         e.alive = false
         e.hpBack.isHidden = true
+        if let l = e.light {
+            e.light = nil
+            l.run(.sequence([.fadeOut(withDuration: 0.4), .removeFromParent()]))
+        }
         burst(at: e.position, color: e.deathColor, count: e is Boss ? 50 : 16, speed: e is Boss ? 420 : 240)
         splat(at: e.position, size: e is Boss ? 260 : 80 + e.radius * 2, color: Ink.black, alpha: 0.85, fade: 14)
         splat(at: e.position, size: e is Boss ? 160 : 40 + e.radius, color: Ink.blood, alpha: 0.6, fade: 14)
@@ -356,6 +366,7 @@ extension GameScene {
         burst(at: p, color: color, count: 16, speed: radius * 3)
         sfx(.explode, 0.7)
         addShake(hostile ? 6 : 4)
+        flashLight(at: p, radius: radius * 3.2, color: color, alpha: 1, duration: 0.45)
         if hostile {
             if let pl = player, pl.position.distance(to: p) < radius + pl.radius * 0.5 {
                 hurtPlayer(damage, from: p)
@@ -397,6 +408,8 @@ extension GameScene {
         addShake(7)
         hitstop = 0.06
         hud.flashHurt()
+        punch(0.03)
+        flashLight(at: p.position, radius: 240, color: Ink.blood, alpha: 0.8, duration: 0.3)
         Haptics.heavy()
         sfx(.playerHurt)
         if let s = src {
@@ -463,6 +476,8 @@ extension GameScene {
         }
         pr.art.zRotation = screenAngle(vel.angle)
         pr.zPosition = depthZ(p) + 0.5
+        pr.light = makeLight(radius: color == nil ? 90 : 170, color: color ?? Ink.bone, alpha: color == nil ? 0.35 : 0.85)
+        pr.light?.position = screenPoint(p, height: 26)
         world.addChild(pr)
         projectiles.append(pr)
         return pr
@@ -511,6 +526,8 @@ extension GameScene {
             }
         }
         for pr in projectiles where pr.dead {
+            pr.light?.removeFromParent()
+            pr.light = nil
             pr.run(.sequence([.fadeOut(withDuration: 0.08), .removeFromParent()]))
         }
         projectiles.removeAll { $0.dead }
@@ -556,6 +573,10 @@ extension GameScene {
     func takeAnim(_ pk: Pickup) {
         sfx(.pickup)
         burst(at: pk.position, color: pk.reward?.color ?? .yellow, count: 14, speed: 200)
+        if let l = pk.light {
+            pk.light = nil
+            l.run(.sequence([.fadeOut(withDuration: 0.4), .removeFromParent()]))
+        }
         pk.run(.sequence([.group([.scale(to: 1.5, duration: 0.2), .fadeOut(withDuration: 0.2)]), .removeFromParent()]))
     }
 

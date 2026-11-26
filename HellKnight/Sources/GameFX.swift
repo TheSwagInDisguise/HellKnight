@@ -192,6 +192,7 @@ extension GameScene {
         core.zPosition = 0.1
         s.addChild(core)
         s.run(.sequence([.fadeOut(withDuration: 0.22), .removeFromParent()]))
+        flashLight(at: b, radius: 220, color: color, alpha: 0.8, duration: 0.2)
     }
 
     func afterimage() {

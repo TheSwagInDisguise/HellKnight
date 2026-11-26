@@ -38,6 +38,7 @@ extension GameScene {
         }
         room = Room(bounds: CGRect(x: -w / 2, y: -h / 2, width: w, height: h), type: type)
         addPillars()
+        resetLights()
         drawRoom(pal)
 
         let p = Player(weapon: runData.weapon)
@@ -51,9 +52,15 @@ extension GameScene {
         cam.position = camBase
 
         makeDoors(pal)
+        addProps(pal)
+        addFog()
 
         switch type {
         case .combat:
+            if shot != nil {
+                setupShotRoom()
+                break
+            }
             waves = generateWaves()
             let m = SKNode()
             world.addChild(m)
@@ -72,6 +79,11 @@ extension GameScene {
             healPlayer(runData.maxHp * 0.2)
             hud.banner("The Ash Merchant", "Walk over an item to buy it", color: UIColor(hex: 0xf0c040))
         case .boss:
+            if shot != nil {
+                combatStarted = true
+                finishSpawn(.boss, at: CGPoint(x: 0, y: room.bounds.midY + 150))
+                break
+            }
             let name = Boss.names[min(runData.depth, 2)]
             hud.banner(name, "Guardian of the \(pal.name)", color: UIColor(hex: 0xff5030))
             let m = SKNode()
@@ -83,7 +95,7 @@ extension GameScene {
             }]))
         }
         let where_ = type == .boss ? "Guardian" : (type == .shop ? "Merchant" : "Chamber \(runData.room + 1)")
-        hud.roomLabel.text = "\(pal.name) · \(where_)"
+        setKerned(hud.roomLabel, "\(pal.name) · \(where_)".uppercased(), kern: 2.5)
     }
 
     func addPillars() {
@@ -99,7 +111,7 @@ extension GameScene {
         case .shop:
             break
         case .combat:
-            let n = Int.random(in: 2...5)
+            let n = Int.random(in: 1...3)
             var tries = 0
             while room.pillars.count < n && tries < 80 {
                 tries += 1
@@ -180,7 +192,7 @@ extension GameScene {
             sh.zPosition = -1
             n.addChild(sh)
             let up = Billboard()
-            let col = SKSpriteNode(texture: Tex.pillar(runData.depth), size: CGSize(width: pl.r * 1.9, height: pl.r * 1.9 * 200 / 72))
+            let col = SKSpriteNode(texture: Tex.pillar(runData.depth), size: CGSize(width: pl.r * 1.8, height: pl.r * 1.8 * 2.15))
             col.anchorPoint = CGPoint(x: 0.5, y: 0.06)
             up.addChild(col)
             n.addChild(up)
@@ -246,6 +258,7 @@ extension GameScene {
         up.addChild(f)
         f.run(.repeatForever(.sequence([.scaleY(to: 1.3, duration: 0.12), .scaleY(to: 0.85, duration: 0.15)])))
         world.addChild(n)
+        addLight(at: p, height: 100, radius: 360, color: color.scaled(1.1), alpha: 0.85, flicker: true)
     }
 
     // MARK: - Doors & walls
@@ -289,7 +302,7 @@ extension GameScene {
             doors.append(door)
         }
         for si in 0..<segCount where !doorSegs.contains(si) {
-            let v = si % 3 == 1 ? 1 : (si % 4 == 3 ? 2 : 0)
+            let v = si % 3 == 1 ? 1 : (si % 3 == 2 ? 3 : (si % 4 == 0 ? 2 : 0))
             addWallSegment(at: CGPoint(x: b.minX + 64 + CGFloat(si) * 128, y: b.maxY), texture: Tex.wallSeg(d, side: 0, v))
             if si % 2 == 0 && si > 0 {
                 addTorch(at: CGPoint(x: b.minX + CGFloat(si) * 128, y: b.maxY), color: pal.accent)
@@ -298,10 +311,128 @@ extension GameScene {
         // Back-right wall runs along maxX.
         let segCountR = Int((b.height / 128).rounded())
         for sj in 0..<segCountR {
-            let v = sj % 3 == 1 ? 1 : (sj % 4 == 2 ? 2 : 0)
+            let v = sj % 3 == 1 ? 1 : (sj % 3 == 0 ? 3 : (sj % 4 == 2 ? 2 : 0))
             addWallSegment(at: CGPoint(x: b.maxX, y: b.minY + 64 + CGFloat(sj) * 128), texture: Tex.wallSeg(d, side: 1, v))
             if sj % 2 == 1 {
                 addTorch(at: CGPoint(x: b.maxX, y: b.minY + CGFloat(sj) * 128), color: pal.accent)
+            }
+        }
+    }
+
+    // MARK: - Props & dressing
+
+    /// Adds an upright prop (billboard) with a ground shadow. `collide` > 0 blocks movement.
+    private func addProp(_ tex: SKTexture, size: CGSize, at p: CGPoint, anchorY: CGFloat = 0.06, collide: CGFloat = 0) {
+        let n = SKNode()
+        n.position = p
+        n.zPosition = depthZ(p)
+        let sh = SKSpriteNode(texture: Tex.softShadow(), size: CGSize(width: size.width * 1.2, height: size.width * 1.2))
+        sh.zPosition = -1
+        sh.alpha = 0.8
+        n.addChild(sh)
+        let up = Billboard()
+        let sp = SKSpriteNode(texture: tex, size: size)
+        sp.anchorPoint = CGPoint(x: 0.5, y: anchorY)
+        up.addChild(sp)
+        n.addChild(up)
+        world.addChild(n)
+        if collide > 0 { room.pillars.append(Pillar(pos: p, r: collide)) }
+    }
+
+    private func freeSpot(margin: CGFloat, avoidCenter: Bool = true) -> CGPoint? {
+        let b = room.bounds
+        for _ in 0..<30 {
+            let p = CGPoint(x: rnd(b.minX + margin, b.maxX - margin), y: rnd(b.minY + margin, b.maxY - margin))
+            if room.blocked(p, 40) { continue }
+            if avoidCenter && abs(p.x) < 120 { continue }
+            if p.distance(to: CGPoint(x: 0, y: b.minY + 70)) < 200 { continue }
+            return p
+        }
+        return nil
+    }
+
+    func addProps(_ pal: Palette) {
+        let b = room.bounds
+        let d = runData.depth
+        let warm = UIColor(hex: 0xffa050)
+
+        // Carpet runner from the entrance to the centre, ending in a rune circle.
+        var y = b.minY
+        while y < b.midY - 40 {
+            let c = SKSpriteNode(texture: Tex.carpet(), size: CGSize(width: 96, height: 128))
+            c.anchorPoint = CGPoint(x: 0.5, y: 0)
+            c.position = CGPoint(x: 0, y: y)
+            c.zPosition = 0.8
+            world.addChild(c)
+            y += 128
+        }
+        let rune = SKSpriteNode(texture: Tex.sigil(), size: CGSize(width: 330, height: 330))
+        rune.position = CGPoint(x: 0, y: b.midY)
+        rune.color = pal.accent
+        rune.colorBlendFactor = 1
+        rune.alpha = 0.22
+        rune.zPosition = 0.9
+        rune.run(.repeatForever(.rotate(byAngle: .pi * 2, duration: 60)))
+        world.addChild(rune)
+        addLight(at: CGPoint(x: 0, y: b.midY), height: 0, radius: 240, color: pal.accent, alpha: 0.25)
+
+        // Braziers flanking the room near the back walls.
+        let brazierSpots = [CGPoint(x: b.maxX - 110, y: b.maxY - 110), CGPoint(x: b.minX + 120, y: b.maxY - 110),
+                            CGPoint(x: b.maxX - 110, y: b.minY + 140)]
+        for p in brazierSpots.prefix(room.type == .boss ? 3 : 2) {
+            if room.blocked(p, 30) { continue }
+            addProp(Tex.brazier(), size: CGSize(width: 56, height: 72), at: p, collide: 22)
+            let fl = SKSpriteNode(texture: Tex.flame(), size: CGSize(width: 36, height: 54))
+            fl.blendMode = .add
+            fl.position = screenPoint(p, height: 78)
+            fl.zPosition = depthZ(p) + 0.01
+            fl.run(.repeatForever(.sequence([.scaleY(to: 1.2, duration: 0.11), .scaleY(to: 0.9, duration: 0.13)])))
+            // Flames live in screen space so they stay upright.
+            topLayer.addChild(fl)
+            fl.zPosition = 0
+            addLight(at: p, height: 80, radius: 420, color: warm, alpha: 0.9, flicker: true)
+        }
+
+        // Candle clusters along the back walls.
+        for _ in 0..<Int.random(in: 2...4) {
+            let alongTop = chance(0.5)
+            let p = alongTop ? CGPoint(x: rnd(b.minX + 80, b.maxX - 80), y: b.maxY - 34)
+                             : CGPoint(x: b.maxX - 34, y: rnd(b.minY + 80, b.maxY - 80))
+            if doors.contains(where: { abs($0.position.x - p.x) < 90 && alongTop }) { continue }
+            addProp(Tex.candles(), size: CGSize(width: 50, height: 44), at: p)
+            for k in 0..<3 {
+                let fl = SKSpriteNode(texture: Tex.flame(), size: CGSize(width: 8, height: 13))
+                fl.blendMode = .add
+                fl.position = screenPoint(p, height: 0) + CGPoint(x: -12 + CGFloat(k) * 11, y: 38 - CGFloat(k % 2) * 8)
+                fl.run(.repeatForever(.sequence([.scaleY(to: 1.25, duration: 0.09), .scaleY(to: 0.85, duration: 0.12)])))
+                topLayer.addChild(fl)
+            }
+            addLight(at: p, height: 30, radius: 230, color: warm, alpha: 0.75, flicker: true)
+        }
+
+        guard room.type != .shop else { return }
+
+        // Lava grates set into the floor.
+        for _ in 0..<(room.type == .boss ? 2 : Int.random(in: 0...2)) {
+            guard let p = freeSpot(margin: 160) else { break }
+            let g = SKSpriteNode(texture: Tex.grate(d), size: CGSize(width: 96, height: 96))
+            g.position = p
+            g.zPosition = 0.85
+            world.addChild(g)
+            addLight(at: p, height: 0, radius: 260, color: pal.accent, alpha: 0.65, flicker: true)
+            let em = makeEmbers(area: CGSize(width: 70, height: 70), color: pal.ember, rate: 6)
+            em.position = p
+            em.zPosition = 46
+            world.addChild(em)
+        }
+
+        // Scattered bones and rubble.
+        for i in 0..<Int.random(in: 3...6) {
+            guard let p = freeSpot(margin: 60, avoidCenter: false) else { break }
+            if i % 2 == 0 {
+                addProp(Tex.bones(), size: CGSize(width: 64, height: 37), at: p, anchorY: 0.2)
+            } else {
+                addProp(Tex.rubble(d), size: CGSize(width: 60, height: 34), at: p, anchorY: 0.2)
             }
         }
     }
@@ -330,7 +461,10 @@ extension GameScene {
     func openDoors() {
         guard !doorsOpen else { return }
         doorsOpen = true
-        for d in doors { d.setOpen() }
+        for d in doors {
+            d.setOpen()
+            addLight(at: d.position, height: 60, radius: 260, color: d.reward.color, alpha: 0.75, flicker: true)
+        }
         if !doors.isEmpty { sfx(.door, 0.6) }
     }
 
@@ -385,6 +519,7 @@ extension GameScene {
             pk.zPosition = 5
             world.addChild(pk)
             pickups.append(pk)
+            pk.light = addLight(at: pk.position, height: 60, radius: 240, color: it.0.color, alpha: 0.6)
         }
     }
 
@@ -478,6 +613,12 @@ extension GameScene {
         e.run(.fadeIn(withDuration: 0.15))
         world.addChild(e)
         enemies.append(e)
+        if k == .wisp {
+            e.light = makeLight(radius: 200, color: e.deathColor, alpha: 0.75)
+        } else if let bs = e as? Boss {
+            e.light = makeLight(radius: 420, color: bs.color, alpha: 0.8)
+        }
+        flashLight(at: pos, radius: 260, color: Ink.blood, alpha: 0.8, duration: 0.5)
         burst(at: pos, color: Ink.blood, count: 10, speed: 140)
         splat(at: pos, size: k == .boss ? 200 : 70, color: Ink.black, alpha: 0.7, fade: 6)
         if let b = e as? Boss {
@@ -521,6 +662,7 @@ extension GameScene {
         pk.zPosition = 5
         world.addChild(pk)
         pickups.append(pk)
+        pk.light = addLight(at: pk.position, height: 50, radius: 300, color: r.color, alpha: 0.8, flicker: true)
         pk.setScale(0)
         pk.run(.scale(to: 1, duration: 0.3))
         sfx(.pickup)

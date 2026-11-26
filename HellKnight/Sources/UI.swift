@@ -13,12 +13,17 @@ final class Button: SKNode {
         didSet { alpha = enabled ? 1 : 0.45 }
     }
 
-    init(_ text: String, size: CGSize, accent: UIColor = Ink.gold, fontSize: CGFloat = 17,
-         font: String = Font.title, texture: SKTexture? = nil, onTap: @escaping () -> Void) {
+    init(_ text: String, size: CGSize, accent: UIColor? = nil, fontSize: CGFloat = 16,
+         font: String = Font.bold, texture: SKTexture? = nil, onTap: @escaping () -> Void) {
         self.onTap = onTap
         self.size = size
-        bg = SKSpriteNode(texture: texture ?? Tex.panel(size.width, size.height, accent: accent), size: size)
-        label = makeLabel(text, size: fontSize, color: Ink.bone, font: font)
+        if let t = texture {
+            bg = SKSpriteNode(texture: t, size: CGSize(width: size.width + 10, height: size.height + 10))
+        } else {
+            bg = SKSpriteNode(texture: Tex.panel(size.width, size.height, accent: accent),
+                              size: CGSize(width: size.width + 8, height: size.height + 8))
+        }
+        label = makeLabel(text.uppercased(), size: fontSize, color: Ink.bone, font: font, kern: text.isEmpty ? 0 : 1.2)
         super.init()
         addChild(bg)
         label.zPosition = 1
@@ -30,8 +35,8 @@ final class Button: SKNode {
     func setHighlight(_ on: Bool) {
         removeAction(forKey: "hl")
         run(.scale(to: on ? 0.94 : 1, duration: 0.06), withKey: "hl")
-        bg.color = Ink.gold
-        bg.colorBlendFactor = on ? 0.25 : 0
+        bg.color = .white
+        bg.colorBlendFactor = on ? 0.15 : 0
     }
 }
 
@@ -136,10 +141,10 @@ final class Controls: SKNode {
         addChild(joyBase)
         addChild(joyKnob)
         let defs: [(Act, String, CGFloat, UIColor)] = [
-            (.attack, "", 50, Ink.blood),
-            (.special, "hurricane", 36, Ink.gold),
-            (.cast, "flame.fill", 34, UIColor(hex: 0xff6a3a)),
-            (.dash, "wind", 36, Ink.bone),
+            (.attack, "", 50, UIColor(hex: 0xff6a50)),
+            (.special, "hurricane", 36, UIColor.white),
+            (.cast, "flame.fill", 34, UIColor(hex: 0xff8a50)),
+            (.dash, "wind", 36, UIColor.white),
         ]
         for (a, sym, r, accent) in defs {
             let pad = SKSpriteNode(texture: Tex.medallion(r, accent: accent), size: CGSize(width: r * 2 + 4, height: r * 2 + 4))
@@ -160,11 +165,12 @@ final class Controls: SKNode {
             pads[a] = pad
             padRadius[a] = r
         }
-        let gem = SKSpriteNode(texture: Tex.gem(0xff4a2a), size: CGSize(width: 20, height: 22))
-        gem.position = CGPoint(x: 24, y: -22)
-        gem.zPosition = 2
-        pads[.cast]?.addChild(gem)
-        castLabel.position = CGPoint(x: 24, y: -36)
+        let badge = SKSpriteNode(texture: Tex.medallion(10, accent: UIColor(hex: 0xff8a50)), size: CGSize(width: 24, height: 24))
+        badge.position = CGPoint(x: 24, y: -24)
+        badge.zPosition = 2
+        pads[.cast]?.addChild(badge)
+        castLabel.fontSize = 12
+        castLabel.position = CGPoint(x: 24, y: -24)
         castLabel.zPosition = 3
         pads[.cast]?.addChild(castLabel)
     }
@@ -289,8 +295,9 @@ final class HUD: SKNode {
     let hpFrame: SKSpriteNode
     let hpFill: SKSpriteNode
     let hpShine: SKSpriteNode
-    let hpText = makeLabel("", size: 12, color: Ink.bone, font: Font.heavy)
-    let heartMedal = SKSpriteNode(texture: Tex.medallion(22, accent: Ink.blood), size: CGSize(width: 48, height: 48))
+    let hpTrail: SKSpriteNode
+    let hpText = makeLabel("", size: 11, color: .white, font: Font.bold)
+    let heartMedal = SKNode()
     let dashNode = SKNode()
     let castNode = SKNode()
     var dashBuilt = -1
@@ -299,8 +306,8 @@ final class HUD: SKNode {
     let soulLabel = makeLabel("", size: 13, color: UIColor(hex: 0xb79cff), font: Font.heavy, align: .right)
     let goldIcon = SKSpriteNode(texture: Tex.icon(.gold), size: CGSize(width: 20, height: 20))
     let soulIcon = SKSpriteNode(texture: Tex.icon(.souls), size: CGSize(width: 18, height: 18))
-    let roomLabel = makeLabel("", size: 14, color: Ink.bone, font: Font.title)
-    let roomDivider = SKSpriteNode(texture: Tex.divider(220), size: CGSize(width: 220, height: 14))
+    let roomLabel = makeLabel("", size: 13, color: Ink.bone.withAlphaComponent(0.85), font: Font.title)
+    let roomDivider = SKSpriteNode(texture: Tex.divider(220), size: CGSize(width: 220, height: 6))
     let bossNode = SKNode()
     static let bossW: CGFloat = 360
     var bossWidth: CGFloat { HUD.bossW }
@@ -309,7 +316,7 @@ final class HUD: SKNode {
     let bannerTitle = makeLabel("", size: 30, font: Font.title)
     let bannerShadow = makeLabel("", size: 30, color: Ink.black, font: Font.title)
     let bannerSub = makeLabel("", size: 15, color: Ink.bone, font: Font.medium)
-    let bannerDivider = SKSpriteNode(texture: Tex.divider(300), size: CGSize(width: 300, height: 14))
+    let bannerDivider = SKSpriteNode(texture: Tex.divider(300), size: CGSize(width: 300, height: 6))
     var pauseButton: Button!
     let boonRow = SKNode()
     var boonSig = ""
@@ -317,7 +324,8 @@ final class HUD: SKNode {
     override init() {
         hpFrame = SKSpriteNode(texture: Tex.barFrame(HUD.hpW, 14), size: CGSize(width: HUD.hpW + 24, height: 22))
         hpFill = SKSpriteNode(color: Ink.blood, size: CGSize(width: HUD.hpW, height: 12))
-        hpShine = SKSpriteNode(color: UIColor(white: 1, alpha: 0.18), size: CGSize(width: HUD.hpW, height: 3))
+        hpShine = SKSpriteNode(color: UIColor(white: 1, alpha: 0.22), size: CGSize(width: HUD.hpW, height: 3))
+        hpTrail = SKSpriteNode(color: UIColor(hex: 0xffe0b0), size: CGSize(width: HUD.hpW, height: 12))
         bossFill = SKSpriteNode(color: Ink.blood, size: CGSize(width: HUD.bossW, height: 10))
         super.init()
     }
@@ -334,6 +342,10 @@ final class HUD: SKNode {
 
         hpFrame.anchorPoint = CGPoint(x: 0, y: 0.5)
         addChild(hpFrame)
+        hpTrail.anchorPoint = CGPoint(x: 0, y: 0.5)
+        hpTrail.zPosition = 0.9
+        hpTrail.alpha = 0.85
+        addChild(hpTrail)
         hpFill.anchorPoint = CGPoint(x: 0, y: 0.5)
         hpFill.zPosition = 1
         addChild(hpFill)
@@ -343,7 +355,7 @@ final class HUD: SKNode {
         hpText.zPosition = 2
         addChild(hpText)
         heartMedal.zPosition = 3
-        let heart = SKSpriteNode(texture: Tex.icon(.heart), size: CGSize(width: 30, height: 30))
+        let heart = SKSpriteNode(texture: Tex.icon(.heart), size: CGSize(width: 28, height: 28))
         heart.zPosition = 1
         heartMedal.addChild(heart)
         heart.run(.repeatForever(.sequence([.scale(to: 1.12, duration: 0.15), .scale(to: 1, duration: 0.15), .wait(forDuration: 0.7)])))
@@ -365,7 +377,7 @@ final class HUD: SKNode {
         bossFill.position = CGPoint(x: -bossWidth / 2, y: 0)
         bossFill.zPosition = 1
         bossNode.addChild(bossFill)
-        let bd = SKSpriteNode(texture: Tex.divider(300), size: CGSize(width: 300, height: 14))
+        let bd = SKSpriteNode(texture: Tex.divider(300), size: CGSize(width: 300, height: 6))
         bd.position = CGPoint(x: 0, y: 30)
         bossNode.addChild(bd)
         bossName.position = CGPoint(x: 0, y: 18)
@@ -407,6 +419,7 @@ final class HUD: SKNode {
         heartMedal.position = CGPoint(x: L + 22, y: T)
         hpFrame.position = CGPoint(x: L + 30, y: T)
         hpFill.position = CGPoint(x: L + 42, y: T)
+        hpTrail.position = CGPoint(x: L + 42, y: T)
         hpShine.position = CGPoint(x: L + 42, y: T + 3)
         hpText.position = CGPoint(x: L + 42 + hpWidth / 2, y: T)
         dashNode.position = CGPoint(x: L + 56, y: T - 24)
@@ -418,7 +431,7 @@ final class HUD: SKNode {
         soulIcon.position = CGPoint(x: R - 60, y: T - 22)
         soulLabel.position = CGPoint(x: R - 74, y: T - 22)
         roomLabel.position = CGPoint(x: 0, y: T + 2)
-        roomDivider.position = CGPoint(x: 0, y: T - 12)
+        roomDivider.position = CGPoint(x: 0, y: T - 11)
         bossNode.position = CGPoint(x: 0, y: T - 52)
         bannerTitle.position = CGPoint(x: 0, y: size.height * 0.2)
         bannerShadow.position = CGPoint(x: 2, y: size.height * 0.2 - 2)
@@ -439,6 +452,11 @@ final class HUD: SKNode {
         let f = max(0, min(1, run.hp / max(1, run.maxHp)))
         hpFill.xScale = f
         hpShine.xScale = f
+        if hpTrail.xScale > f {
+            hpTrail.xScale = max(f, hpTrail.xScale - 0.012)
+        } else {
+            hpTrail.xScale = f
+        }
         hpText.text = "\(Int(max(0, run.hp).rounded(.up))) / \(Int(run.maxHp))"
         if dashBuilt != run.maxDash {
             dashBuilt = run.maxDash
@@ -456,7 +474,10 @@ final class HUD: SKNode {
         soulLabel.text = "\(run.souls)"
         if let b = boss, b.alive {
             bossNode.isHidden = false
-            bossName.text = b.bossName.uppercased()
+            if bossName.name != b.bossName {
+                bossName.name = b.bossName
+                setKerned(bossName, b.bossName.uppercased(), kern: 2.5)
+            }
             bossFill.xScale = max(0, b.hp / b.maxHp)
         } else {
             bossNode.isHidden = true
@@ -489,11 +510,11 @@ final class HUD: SKNode {
     }
 
     func banner(_ title: String, _ sub: String = "", color: UIColor = Ink.bone, small: Bool = false) {
-        bannerTitle.text = title
-        bannerShadow.text = title
         bannerTitle.fontColor = color
-        bannerTitle.fontSize = small ? 22 : 32
+        bannerTitle.fontSize = small ? 22 : 34
         bannerShadow.fontSize = bannerTitle.fontSize
+        setKerned(bannerTitle, title.uppercased(), kern: small ? 3 : 5)
+        setKerned(bannerShadow, title.uppercased(), kern: small ? 3 : 5)
         bannerSub.text = sub
         for l in [bannerTitle, bannerShadow, bannerSub, bannerDivider] as [SKNode] {
             l.removeAllActions()

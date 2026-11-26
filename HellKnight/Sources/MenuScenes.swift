@@ -50,9 +50,6 @@ final class TitleScene: BaseScene {
         let H = size.height
         addBackdrop(to: self, glowColor: Ink.blood)
 
-        let frame = SKSpriteNode(texture: Tex.panel(W - 24, H - 24, fillAlpha: 0), size: CGSize(width: W - 24, height: H - 24))
-        frame.zPosition = 60
-        addChild(frame)
 
         let halo = SKSpriteNode(texture: Tex.glow(), size: CGSize(width: 260, height: 260))
         halo.color = Ink.blood
@@ -69,23 +66,23 @@ final class TitleScene: BaseScene {
 
         let fs = min(76, W * 0.1)
         let ty = -H * 0.12
-        let shadow = makeLabel("HELLKNIGHT", size: fs, color: Ink.blood, font: Font.title)
+        let shadow = makeLabel("HELLKNIGHT", size: fs, color: Ink.blood, font: Font.title, kern: fs * 0.18)
         shadow.position = CGPoint(x: 3, y: ty - 3)
         shadow.zPosition = 2
         addChild(shadow)
-        let title = makeLabel("HELLKNIGHT", size: fs, color: Ink.bone, font: Font.title)
+        let title = makeLabel("HELLKNIGHT", size: fs, color: Ink.bone, font: Font.title, kern: fs * 0.18)
         title.position = CGPoint(x: 0, y: ty)
         title.zPosition = 3
         addChild(title)
-        let div = SKSpriteNode(texture: Tex.divider(min(420, W * 0.6)), size: CGSize(width: min(420, W * 0.6), height: 14))
+        let div = SKSpriteNode(texture: Tex.divider(min(420, W * 0.6)), size: CGSize(width: min(420, W * 0.6), height: 6))
         div.position = CGPoint(x: 0, y: ty - fs * 0.5)
         div.zPosition = 3
         addChild(div)
-        let sub = makeLabel("A descent through the burning abyss", size: 17, color: Ink.boneDark, font: Font.medium)
+        let sub = makeLabel("A DESCENT THROUGH THE BURNING ABYSS", size: 12, color: Ink.boneDark, font: Font.bold, kern: 3)
         sub.position = CGPoint(x: 0, y: ty - fs * 0.5 - 22)
         sub.zPosition = 3
         addChild(sub)
-        let tap = makeLabel("— Touch to Begin —", size: 17, color: Ink.bone, font: Font.title)
+        let tap = makeLabel("TOUCH TO BEGIN", size: 14, color: Ink.bone, font: Font.bold, kern: 4)
         tap.position = CGPoint(x: 0, y: -H * 0.38)
         tap.zPosition = 3
         addChild(tap)
@@ -131,11 +128,11 @@ final class SanctumScene: BaseScene {
         let B = -H / 2 + max(safe.bottom, 6) + 8
         addBackdrop(to: self, glowColor: UIColor(hex: 0xff4a10))
 
-        let title = makeLabel("SANCTUM OF ASH", size: 22, color: Ink.bone, font: Font.title)
+        let title = makeLabel("SANCTUM OF ASH", size: 22, color: Ink.bone, font: Font.title, kern: 5)
         title.position = CGPoint(x: 0, y: T - 6)
         title.zPosition = 10
         addChild(title)
-        let div = SKSpriteNode(texture: Tex.divider(260), size: CGSize(width: 260, height: 14))
+        let div = SKSpriteNode(texture: Tex.divider(260), size: CGSize(width: 260, height: 6))
         div.position = CGPoint(x: 0, y: T - 24)
         div.zPosition = 10
         addChild(div)
@@ -166,7 +163,7 @@ final class SanctumScene: BaseScene {
         }
 
         // Left: armament
-        let h1 = makeLabel("ARMAMENT", size: 14, color: Ink.gold, font: Font.title)
+        let h1 = makeLabel("ARMAMENT", size: 12, color: Ink.boneDark, font: Font.bold, kern: 3)
         h1.position = CGPoint(x: leftX, y: panelTop - 20)
         h1.zPosition = 10
         addChild(h1)
@@ -174,13 +171,16 @@ final class SanctumScene: BaseScene {
         let bh: CGFloat = min(36, (panelH - 150) / 4)
         for (i, w) in WeaponKind.allCases.enumerated() {
             let sel = w == selected
-            let b = Button(w.name, size: CGSize(width: colW - 30, height: bh), accent: sel ? Ink.blood : Ink.goldDark,
+            let b = Button(w.name, size: CGSize(width: colW - 30, height: bh), accent: sel ? Ink.blood : nil,
                            fontSize: 15) { [weak self] in
                 meta.data.weapon = w.rawValue
                 meta.save()
                 self?.build()
             }
-            if !sel { b.label.fontColor = Ink.boneDark }
+            if !sel {
+                b.label.fontColor = Ink.boneDark
+                setKerned(b.label, w.name.uppercased(), kern: 1.2)
+            }
             if sel {
                 let ic = SKSpriteNode(texture: Tex.weapon(w))
                 ic.size = w == .fists ? CGSize(width: 20, height: 20) : CGSize(width: 40, height: 9)
@@ -210,7 +210,7 @@ final class SanctumScene: BaseScene {
         start.run(.repeatForever(.sequence([.scale(to: 1.03, duration: 0.8), .scale(to: 1, duration: 0.8)])))
 
         // Right: Altar of Embers
-        let h2 = makeLabel("ALTAR OF EMBERS", size: 14, color: Ink.gold, font: Font.title)
+        let h2 = makeLabel("ALTAR OF EMBERS", size: 12, color: Ink.boneDark, font: Font.bold, kern: 3)
         h2.position = CGPoint(x: rightX, y: panelTop - 20)
         h2.zPosition = 10
         addChild(h2)
@@ -226,15 +226,19 @@ final class SanctumScene: BaseScene {
             let maxed = rank >= u.maxRank
             let cost = u.cost(rank)
             if i > 0 {
-                let sep = SKSpriteNode(color: Ink.gold.withAlphaComponent(0.18), size: CGSize(width: inner, height: 1))
+                let sep = SKSpriteNode(color: UIColor(white: 1, alpha: 0.07), size: CGSize(width: inner, height: 1))
                 sep.position = CGPoint(x: rightX, y: y + rowH / 2)
                 sep.zPosition = 9
                 addChild(sep)
             }
-            var pips = ""
-            for r in 0..<u.maxRank { pips += r < rank ? "◆" : "◇" }
-            let name = makeLabel("\(u.title)  \(pips)", size: min(14, rowH * 0.37),
+            let name = makeLabel(u.title, size: min(14, rowH * 0.37),
                                  color: maxed ? Ink.gold : Ink.bone, font: Font.bold, align: .left)
+            for r in 0..<u.maxRank {
+                let pip = SKSpriteNode(texture: Tex.gem(r < rank ? 0xb79cff : 0x3a3448), size: CGSize(width: 9, height: 9))
+                pip.position = CGPoint(x: rightX + inner / 2 - btnW - 14 - CGFloat(u.maxRank - 1 - r) * 10, y: y + rowH * 0.17)
+                pip.zPosition = 10
+                addChild(pip)
+            }
             name.position = CGPoint(x: rightX - inner / 2, y: y + rowH * 0.17)
             name.zPosition = 10
             addChild(name)
